@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# SQLite local fallback (outside the docker volume)
+*.db
+*.db-journal
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
