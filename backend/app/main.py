@@ -1,6 +1,7 @@
 """FastAPI app entry point."""
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,11 +14,25 @@ from .schemas import HealthOut
 from .seed_data import seed_companies
 
 
+def _run_migrations() -> None:
+    """Run Alembic migrations programmatically on startup (Postgres only)."""
+    from alembic.config import Config
+    from alembic import command
+
+    # alembic.ini lives one directory above app/
+    ini_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+    cfg = Config(ini_path)
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    command.upgrade(cfg, "head")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    # Seed the two fictional companies on first boot. Idempotent — existing
-    # rows are left alone so manager edits survive restarts.
+    if settings.use_alembic:
+        _run_migrations()
+    else:
+        init_db()
+
     with SessionLocal() as db:
         seed_companies(db)
     yield

@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates, clearCandidateId, getCandidateId } from "../api.js";
+import { candidates } from "../api.js";
+
+const _CID_KEY = "parallax:candidate-id";
+const _getCandidateId = () => localStorage.getItem(_CID_KEY);
+const _clearCandidateId = () => localStorage.removeItem(_CID_KEY);
 import { GeneratingScreen, MiniBar, formatCriterion } from "../components/Widgets.jsx";
 
 // Persistent, read-only view of the candidate's quiz results. Loaded by UUID
@@ -15,7 +19,7 @@ export default function CandidateProfile() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const id = getCandidateId();
+    const id = _getCandidateId();
     if (!id) {
       nav("/intake", { replace: true });
       return;
@@ -26,7 +30,7 @@ export default function CandidateProfile() {
       .catch((e) => {
         if (e.status === 404) {
           // Stale localStorage pointing at a candidate the server no longer has.
-          clearCandidateId();
+          _clearCandidateId();
           nav("/intake", { replace: true });
         } else {
           setError(e.message);
@@ -157,7 +161,7 @@ export default function CandidateProfile() {
           className="ghost"
           onClick={() => {
             if (confirm("Forget this profile on this browser?")) {
-              clearCandidateId();
+              _clearCandidateId();
               nav("/intake");
             }
           }}

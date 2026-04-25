@@ -1,59 +1,36 @@
-// Tiny fetch wrapper with:
+// Thin fetch wrapper:
 //  * VITE_API_BASE_URL injection (docker-compose or local dev)
-//  * Optional basic-auth header for manager routes, read from sessionStorage
+//  * Bearer token from active Supabase session for auth-gated routes
 //  * JSON content-type handling + error surfacing
 
-// In dev (no VITE_API_BASE_URL set) BASE is empty — requests go to the same
-// origin and Vite's proxy forwards them to localhost:8000. In production /
-// Docker, set VITE_API_BASE_URL to the real backend URL.
 const BASE = import.meta.env?.VITE_API_BASE_URL || "";
 
-// ---------- Manager credentials (sessionStorage-backed) ----------
-const CREDS_KEY = "hiring-sim:manager-creds";
+// Lazily imported to avoid circular deps; set via setSessionGetter() at app init.
+let _getSession = () => null;
 
-export function setManagerCreds(username, password) {
-  const encoded = btoa(`${username}:${password}`);
-  sessionStorage.setItem(CREDS_KEY, encoded);
+export function setSessionGetter(fn) {
+  _getSession = fn;
 }
 
-export function clearManagerCreds() {
-  sessionStorage.removeItem(CREDS_KEY);
-}
-
-export function hasManagerCreds() {
-  return !!sessionStorage.getItem(CREDS_KEY);
-}
-
-function authHeader() {
-  const enc = sessionStorage.getItem(CREDS_KEY);
-  return enc ? { Authorization: `Basic ${enc}` } : {};
-}
-
-// ---------- Candidate ID (localStorage-backed) ----------
-const CANDIDATE_KEY = "hiring-sim:candidate-id";
-
-export function getCandidateId() {
-  return localStorage.getItem(CANDIDATE_KEY);
-}
-
-export function setCandidateId(id) {
-  if (id) localStorage.setItem(CANDIDATE_KEY, id);
-}
-
-export function clearCandidateId() {
-  localStorage.removeItem(CANDIDATE_KEY);
+async function authHeader() {
+  const session = await _getSession();
+  if (session?.access_token) {
+    return { Authorization: `Bearer ${session.access_token}` };
+  }
+  return {};
 }
 
 // ---------- Core request helper ----------
 async function request(
   path,
-  { method = "GET", body, manager = false, headers = {}, raw = false } = {},
+  { method = "GET", body, auth = false, headers = {}, raw = false } = {},
 ) {
+  const authHdr = auth ? await authHeader() : {};
   const init = {
     method,
     headers: {
       ...(body && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
-      ...(manager ? authHeader() : {}),
+      ...authHdr,
       ...headers,
     },
   };
@@ -79,19 +56,19 @@ export const candidates = {
   get: (id) => request(`/candidates/${id}`),
   update: (id, payload) =>
     request(`/candidates/${id}`, { method: "PATCH", body: payload }),
-  list: () => request("/candidates", { manager: true }),
+  list: () => request("/candidates", { auth: true }),
 };
 
 // ---------- Company endpoints ----------
 export const companies = {
-  list: () => request("/companies", { manager: true }),
-  get: (id) => request(`/companies/${id}`, { manager: true }),
+  list: () => request("/companies", { auth: true }),
+  get: (id) => request(`/companies/${id}`, { auth: true }),
   create: (payload) =>
-    request("/companies", { method: "POST", body: payload, manager: true }),
+    request("/companies", { method: "POST", body: payload, auth: true }),
   update: (id, payload) =>
-    request(`/companies/${id}`, { method: "PUT", body: payload, manager: true }),
+    request(`/companies/${id}`, { method: "PUT", body: payload, auth: true }),
   remove: (id) =>
-    request(`/companies/${id}`, { method: "DELETE", manager: true, raw: true }),
+    request(`/companies/${id}`, { method: "DELETE", auth: true, raw: true }),
 };
 
 // ---------- Templates (artifact parse + criteria extract) ----------
@@ -102,13 +79,13 @@ export const templates = {
     return request("/templates/parse-artifact", {
       method: "POST",
       body: fd,
-      manager: true,
+      auth: true,
     });
   },
   extractCriteria: (artifacts, role) =>
     request(
       `/templates/extract-criteria${role ? `?role=${encodeURIComponent(role)}` : ""}`,
-      { method: "POST", body: artifacts, manager: true },
+      { method: "POST", body: artifacts, auth: true },
     ),
 };
 
@@ -118,19 +95,19 @@ export const matches = {
     request("/matches/trigger", {
       method: "POST",
       body: { candidate_id, company_id },
-      manager: true,
+      auth: true,
     }),
   search: (company_id, { refresh = false } = {}) =>
     request("/matches/search", {
       method: "POST",
       body: { company_id, refresh },
-      manager: true,
+      auth: true,
     }),
   list: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return request(`/matches${qs ? `?${qs}` : ""}`, { manager: true });
+    return request(`/matches${qs ? `?${qs}` : ""}`, { auth: true });
   },
-  get: (id) => request(`/matches/${id}`, { manager: true }),
+  get: (id) => request(`/matches/${id}`, { auth: true }),
 };
 
 export const API_BASE = BASE;

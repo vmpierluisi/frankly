@@ -3,15 +3,12 @@ services:
     build:
       context: ./backend
     env_file: .env
-    environment:
-      # Override DATABASE_URL to point at the persistent volume mount.
-      DATABASE_URL: sqlite:////data/hiring_sim.db
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - hiring_sim_db:/data
       # Hot-reload during dev: mount source so uvicorn --reload picks up edits.
       - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 10s
@@ -23,13 +20,11 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
     env_file: .env
     environment:
-      # Use the Docker service name so the Vite proxy can reach the backend
-      # container internally (localhost doesn't resolve to the backend in Docker).
       BACKEND_URL: http://backend:8000
-      # Empty so the frontend uses relative URLs → goes through the Vite proxy
-      # instead of making cross-origin requests directly from the browser.
       VITE_API_BASE_URL: ""
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
@@ -39,6 +34,3 @@ services:
       - ./frontend/vite.config.js:/app/vite.config.js
     depends_on:
       - backend
-
-volumes:
-  hiring_sim_db:

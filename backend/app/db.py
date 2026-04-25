@@ -1,4 +1,4 @@
-"""SQLite/SQLAlchemy session."""
+"""SQLAlchemy session factory."""
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -34,8 +34,11 @@ SessionLocal = sessionmaker(
 
 
 def init_db() -> None:
-    """Create tables on first boot. Called from main on startup."""
-    # Import models so they're registered on Base.metadata.
+    """Create tables via create_all (SQLite / local dev only).
+
+    For Postgres, Alembic migrations are the source of truth — this is never
+    called when settings.use_alembic is True.
+    """
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

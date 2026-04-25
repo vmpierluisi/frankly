@@ -1,56 +1,80 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, GLOBAL_CSS } from "./design.js";
-import {
-  clearManagerCreds,
-  getCandidateId,
-  hasManagerCreds,
-  setManagerCreds,
-} from "./api.js";
+import { setSessionGetter } from "./api.js";
+import { useAuth } from "./lib/auth.js";
+import { supabase } from "./lib/supabase.js";
 import CandidateIntake from "./pages/CandidateIntake.jsx";
 import CandidateProfile from "./pages/CandidateProfile.jsx";
 import ManagerDashboard from "./pages/ManagerDashboard.jsx";
 import TemplateSetup from "./pages/TemplateSetup.jsx";
+import Login from "./pages/Login.jsx";
+
+// Wire the session getter into the API module once at startup.
+setSessionGetter(() => supabase.auth.getSession().then((r) => r.data.session));
 
 export default function App() {
-  const [managerOk, setManagerOk] = useState(hasManagerCreds());
+  const auth = useAuth();
+
+  if (auth.loading) {
+    return (
+      <>
+        <style>{GLOBAL_CSS}</style>
+        <div style={{ padding: 48, color: COLORS.muted, fontFamily: FONT_DISPLAY }}>
+          Loading…
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <style>{GLOBAL_CSS}</style>
-      <Masthead
-        managerOk={managerOk}
-        onLogin={() => setManagerOk(true)}
-        onLogout={() => {
-          clearManagerCreds();
-          setManagerOk(false);
-        }}
-      />
+      <Masthead auth={auth} />
 
       <Routes>
-        <Route path="/" element={<LandingRedirect />} />
-        <Route path="/intake/*" element={<CandidateIntake />} />
-        <Route path="/profile" element={<CandidateProfile />} />
+        {/* Public */}
+        <Route path="/login" element={<Login />} />
+
+        {/* Root redirect */}
+        <Route path="/" element={<RootRedirect auth={auth} />} />
+
+        {/* Candidate-gated */}
+        <Route
+          path="/intake/*"
+          element={
+            <RequireAuth auth={auth} role="candidate">
+              <CandidateIntake />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth auth={auth} role="candidate">
+              <CandidateProfile />
+            </RequireAuth>
+          }
+        />
+
+        {/* Manager-gated */}
         <Route
           path="/manager"
           element={
-            managerOk ? (
+            <RequireAuth auth={auth} role="manager">
               <ManagerDashboard />
-            ) : (
-              <ManagerLogin onLogin={() => setManagerOk(true)} />
-            )
+            </RequireAuth>
           }
         />
         <Route
           path="/manager/templates/:companyId?"
           element={
-            managerOk ? (
+            <RequireAuth auth={auth} role="manager">
               <TemplateSetup />
-            ) : (
-              <ManagerLogin onLogin={() => setManagerOk(true)} />
-            )
+            </RequireAuth>
           }
         />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
@@ -59,17 +83,48 @@ export default function App() {
   );
 }
 
-function LandingRedirect() {
+function RootRedirect({ auth }) {
   const nav = useNavigate();
   useEffect(() => {
-    // If the browser already has a candidate UUID, take them to their profile.
-    // Otherwise start a fresh intake.
-    nav(getCandidateId() ? "/profile" : "/intake", { replace: true });
-  }, [nav]);
+    if (!auth.user) {
+      nav("/login", { replace: true });
+    } else if (auth.role === "manager") {
+      nav("/manager", { replace: true });
+    } else {
+      nav("/intake", { replace: true });
+    }
+  }, [auth.user, auth.role, nav]);
   return null;
 }
 
-function Masthead({ managerOk, onLogin, onLogout }) {
+function RequireAuth({ auth, role, children }) {
+  if (!auth.user) return <Navigate to="/login" replace />;
+  if (role && auth.role !== role) {
+    return (
+      <div className="container" style={{ maxWidth: 460, paddingTop: 48 }}>
+        <div className="label-mono" style={{ marginBottom: 12 }}>Access denied</div>
+        <h2
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 34,
+            fontWeight: 500,
+            margin: "0 0 12px",
+          }}
+        >
+          Wrong role.
+        </h2>
+        <p style={{ color: COLORS.muted }}>
+          You're signed in as{" "}
+          <strong>{auth.user.email}</strong> ({auth.role}) but this page
+          requires the <strong>{role}</strong> role.
+        </p>
+      </div>
+    );
+  }
+  return children;
+}
+
+function Masthead({ auth }) {
   return (
     <header
       style={{
@@ -97,19 +152,33 @@ function Masthead({ managerOk, onLogin, onLogout }) {
         </div>
       </div>
       <div className="nav-bar">
-        <NavLink to="/intake" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-          Intake
-        </NavLink>
-        <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-          My profile
-        </NavLink>
-        <NavLink to="/manager" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-          Manager
-        </NavLink>
-        {managerOk && (
-          <button className="ghost" onClick={onLogout} style={{ padding: "6px 14px" }}>
+        {auth.user && auth.role === "candidate" && (
+          <>
+            <NavLink to="/intake" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+              Intake
+            </NavLink>
+            <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+              My profile
+            </NavLink>
+          </>
+        )}
+        {auth.user && auth.role === "manager" && (
+          <NavLink to="/manager" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+            Manager
+          </NavLink>
+        )}
+        {auth.user ? (
+          <button
+            className="ghost"
+            onClick={auth.signOut}
+            style={{ padding: "6px 14px" }}
+          >
             Sign out
           </button>
+        ) : (
+          <NavLink to="/login" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+            Sign in
+          </NavLink>
         )}
       </div>
     </header>
@@ -133,86 +202,5 @@ function Footer() {
       <div className="label-mono">Screening signal · Not a decision</div>
       <div className="label-mono">Blind matching · Mutual opt-in required</div>
     </footer>
-  );
-}
-
-function ManagerLogin({ onLogin }) {
-  const [username, setUsername] = useState("manager");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const nav = useNavigate();
-
-  async function submit(e) {
-    e.preventDefault();
-    setError("");
-    setManagerCreds(username, password);
-    try {
-      // Validate by calling a manager-gated endpoint.
-      const resp = await fetch(
-        `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8000")}/companies`,
-        { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } },
-      );
-      if (resp.status === 401) {
-        setError("Incorrect credentials.");
-        clearManagerCreds();
-        return;
-      }
-      onLogin();
-      nav("/manager");
-    } catch (e) {
-      setError(e.message);
-      clearManagerCreds();
-    }
-  }
-
-  return (
-    <div className="container" style={{ maxWidth: 460 }}>
-      <div className="label-mono" style={{ marginBottom: 12 }}>Manager · Restricted</div>
-      <h2
-        style={{
-          fontFamily: FONT_DISPLAY,
-          fontSize: 34,
-          fontWeight: 500,
-          margin: "0 0 24px",
-        }}
-      >
-        Sign in to review candidates.
-      </h2>
-      <form onSubmit={submit}>
-        <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
-          Username
-        </label>
-        <input
-          className="ed"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{ marginBottom: 16 }}
-        />
-        <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
-          Password
-        </label>
-        <input
-          className="ed"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ marginBottom: 24 }}
-        />
-        {error && (
-          <div
-            style={{
-              color: COLORS.accent,
-              fontSize: 14,
-              marginBottom: 16,
-              fontFamily: FONT_DISPLAY,
-              fontStyle: "italic",
-            }}
-          >
-            {error}
-          </div>
-        )}
-        <button className="primary" type="submit">Sign in →</button>
-      </form>
-    </div>
   );
 }

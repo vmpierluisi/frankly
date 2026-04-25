@@ -2,16 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for PDF/DOCX parsing (pypdf is pure-python; python-docx is pure-python;
-# but we install build-essential for any wheels that need compilation).
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
+      libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
 
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 
 EXPOSE 8000

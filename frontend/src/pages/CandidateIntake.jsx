@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates, setCandidateId } from "../api.js";
+import { candidates } from "../api.js";
+
+const _CID_KEY = "parallax:candidate-id";
+const _setCandidateId = (id) => id && localStorage.setItem(_CID_KEY, id);
 import { GeneratingScreen, Pillar } from "../components/Widgets.jsx";
 
 // Visual structure ported from hiring-sim-demo.jsx.
@@ -29,7 +32,7 @@ export default function CandidateIntake() {
         bfi_responses: bfiResponses,
         sjt_responses: sjtResponses,
       });
-      setCandidateId(cand.id);
+      _setCandidateId(cand.id);
       setStep("submitted");
     } catch (e) {
       setError(e.message);

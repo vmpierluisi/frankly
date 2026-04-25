@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -39,7 +39,11 @@ class Candidate(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
 
-    # Optional contact (not required for v0; localStorage UUID is the primary key).
+    # Supabase auth identity (null for anonymous / seeded candidates).
+    auth_user_id: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True, index=True, default=None
+    )
+
     display_name: Mapped[str | None] = mapped_column(String(200), default=None)
     email: Mapped[str | None] = mapped_column(String(320), default=None)
 
@@ -57,6 +61,16 @@ class Candidate(Base):
     cached_sjt_signals: Mapped[dict | None] = mapped_column(JSON, default=None)
     cached_inconsistencies: Mapped[list | None] = mapped_column(JSON, default=None)
     cached_narrative: Mapped[str | None] = mapped_column(Text, default=None)
+
+    # Phase B — profile artefacts
+    cv_path: Mapped[str | None] = mapped_column(String(512), default=None)
+    linkedin_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    github_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    # "pending" until BFI+SJT submitted; seeded profiles start as "completed".
+    assessment_status: Mapped[str] = mapped_column(
+        String(20), default="pending", nullable=False
+    )
+    is_seed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
