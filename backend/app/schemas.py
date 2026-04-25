@@ -181,6 +181,36 @@ class FitReport(BaseModel):
     audit_trail: dict[str, Any]
 
 
+class SearchMatchIn(BaseModel):
+    company_id: str
+    refresh: bool = False
+
+
+class FitAxes(BaseModel):
+    role: float
+    culture: float
+    growth: float
+
+
+class SearchMatchResultItem(BaseModel):
+    candidate_id: str
+    narrative: str | None = None
+    overall_score: int
+    band: str
+    band_note: str
+    report: dict[str, Any]
+    fit_axes: FitAxes
+    cached: bool
+
+
+class SearchMatchOut(BaseModel):
+    company_id: str
+    company_name: str
+    role: str
+    pool_size: int
+    results: list[SearchMatchResultItem]
+
+
 class MatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -13,6 +13,7 @@ from .. import schemas
 from ..auth import require_manager
 from ..services import artifact_parser
 from ..services.criteria_extractor import extract_criteria
+from ..services.openrouter import OpenRouterError
 
 router = APIRouter(
     prefix="/templates",
@@ -42,13 +43,39 @@ async def extract_criteria_route(
     Role is passed as a query parameter because it's short context for the LLM
     but doesn't belong on the Company row until save.
     """
-    criteria = await extract_criteria(
-        role=role or "(unspecified role)",
-        artifact_values=payload.artifact_values,
-        artifact_role_spec=payload.artifact_role_spec,
-        artifact_team_structure=payload.artifact_team_structure,
-        artifact_sample_comms=payload.artifact_sample_comms,
-    )
+    artifact_text = " ".join([
+        payload.artifact_values,
+        payload.artifact_role_spec,
+        payload.artifact_team_structure,
+        payload.artifact_sample_comms,
+    ]).strip()
+    if len(artifact_text) < 80:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Not enough artifact content to extract criteria — paste at least "
+                "the values document and role spec before running extraction."
+            ),
+        )
+
+    # Truncate a role that looks like it was auto-filled by a browser extension
+    # (more than 200 chars of plain text with no line breaks is a red flag).
+    clean_role = role.strip()
+    if len(clean_role) > 200 or (len(clean_role) > 80 and "\n" not in clean_role and clean_role.count(" ") > 20):
+        clean_role = "(unspecified role)"
+
+    try:
+        criteria = await extract_criteria(
+            role=clean_role or "(unspecified role)",
+            artifact_values=payload.artifact_values,
+            artifact_role_spec=payload.artifact_role_spec,
+            artifact_team_structure=payload.artifact_team_structure,
+            artifact_sample_comms=payload.artifact_sample_comms,
+        )
+    except OpenRouterError as e:
+        raise HTTPException(status_code=502, detail=f"LLM call failed: {e}") from e
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     return schemas.ExtractCriteriaOut(
         criteria=[schemas.ExtractedCriterion(**c) for c in criteria],
     )

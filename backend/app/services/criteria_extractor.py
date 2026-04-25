@@ -10,6 +10,14 @@ Takes the four company artifacts and returns 5–7 criteria, each with:
 Manager reviews / edits / approves before the criteria are saved on the
 company. Weight re-normalization happens server-side so the manager doesn't
 have to sum to 1.0 manually.
+
+NOTE on schema constraints: the Anthropic structured-output schema validator
+(used via OpenRouter) rejects several standard JSON Schema keywords:
+  - minimum / maximum on number/integer types
+  - minItems / maxItems on arrays (only 0 or 1 accepted for minItems)
+  - pattern on strings
+These constraints are omitted from SCHEMA and enforced in the system prompt
+and in post-hoc Python validation instead.
 """
 from __future__ import annotations
 
@@ -27,8 +35,9 @@ Rules:
 generic "teamwork / communication / ownership" filler.
   2. Each description must cite the artifact text that justifies it. Use short \
 direct quotations inside the description.
-  3. Each criterion's `key` is camelCase (e.g. "analyticalRigor", "speedOfConviction").
-  4. Weights are in [0, 1] and sum to 1.0 across the returned criteria.
+  3. Each criterion's `key` must be camelCase (e.g. "analyticalRigor", \
+"speedOfConviction") — lowercase first letter, no spaces or underscores.
+  4. Each `weight` is a number between 0 and 1; all weights must sum to 1.0.
   5. Never include criteria that proxy for protected characteristics (age, \
 nationality, disability, etc.) or for social background.
   6. Output strict JSON only, matching the schema.
@@ -61,20 +70,19 @@ SAMPLE COMMUNICATIONS:
 """
 
 
+# Anthropic-compatible schema: no pattern, minimum, maximum, minItems,
+# maxItems, minLength, or maxLength — all unsupported by their validator.
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "criteria": {
             "type": "array",
-            "minItems": 5,
-            "maxItems": 7,
             "items": {
                 "type": "object",
                 "properties": {
                     "key": {
                         "type": "string",
-                        "description": "camelCase identifier",
-                        "pattern": "^[a-z][a-zA-Z0-9]*$",
+                        "description": "camelCase identifier, e.g. 'analyticalRigor'.",
                     },
                     "label": {"type": "string"},
                     "description": {
@@ -83,8 +91,7 @@ SCHEMA: dict[str, Any] = {
                     },
                     "weight": {
                         "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
+                        "description": "Contribution weight in [0, 1]; all weights sum to 1.0.",
                     },
                 },
                 "required": ["key", "label", "description", "weight"],
@@ -121,6 +128,12 @@ async def extract_criteria(
         max_tokens=1800,
     )
     criteria: list[dict[str, Any]] = out["criteria"]
+
+    if len(criteria) < 3:
+        raise ValueError(
+            f"Model returned only {len(criteria)} criteria — need at least 3. "
+            "Add more artifact content and try again."
+        )
 
     # Re-normalize weights in case the model didn't quite sum to 1.0.
     total = sum(c.get("weight", 0.0) for c in criteria)

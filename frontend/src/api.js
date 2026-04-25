@@ -120,6 +120,12 @@ export const matches = {
       body: { candidate_id, company_id },
       manager: true,
     }),
+  search: (company_id, { refresh = false } = {}) =>
+    request("/matches/search", {
+      method: "POST",
+      body: { company_id, refresh },
+      manager: true,
+    }),
   list: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/matches${qs ? `?${qs}` : ""}`, { manager: true });

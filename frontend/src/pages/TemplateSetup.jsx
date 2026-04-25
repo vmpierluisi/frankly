@@ -186,11 +186,27 @@ export default function TemplateSetup() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div>
           <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Name</label>
-          <input className="ed" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Meridian Capital Partners" />
+          <input
+            className="ed"
+            value={form.name}
+            onChange={(e) => update("name", e.target.value)}
+            placeholder="Meridian Capital Partners"
+            autoComplete="off"
+            data-form-type="other"
+            data-lpignore="true"
+          />
         </div>
         <div>
           <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Role</label>
-          <input className="ed" value={form.role} onChange={(e) => update("role", e.target.value)} placeholder="Financial Analyst — Credit Underwriting" />
+          <input
+            className="ed"
+            value={form.role}
+            onChange={(e) => update("role", e.target.value)}
+            placeholder="Financial Analyst — Credit Underwriting"
+            autoComplete="off"
+            data-form-type="other"
+            data-lpignore="true"
+          />
         </div>
       </div>
       <div style={{ marginBottom: 32 }}>
@@ -200,6 +216,9 @@ export default function TemplateSetup() {
           value={form.tagline}
           onChange={(e) => update("tagline", e.target.value)}
           placeholder="One-sentence positioning."
+          autoComplete="off"
+          data-form-type="other"
+          data-lpignore="true"
         />
       </div>
 

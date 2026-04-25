@@ -273,3 +273,51 @@ async def run_match(*, persona: dict[str, Any], company: dict[str, Any]) -> dict
             ),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Fit-axis projection — abstract role / culture / growth axes for the 3D map.
+# Placeholder until the mirofish adaptation provides real embedding coords.
+# ---------------------------------------------------------------------------
+_AXIS_KEYWORDS = {
+    "culture": ("culture", "value", "communication", "comms", "collaborat", "team", "trust", "feedback", "dissent"),
+    "growth": ("growth", "learn", "ambition", "curios", "adapt", "develop", "potential", "openness"),
+}
+
+
+def _bucket_for(criterion: dict[str, Any]) -> str:
+    """Classify a criterion into one of role / culture / growth by keyword."""
+    haystack = f"{criterion.get('key','')} {criterion.get('label','')} {criterion.get('description','')}".lower()
+    for axis, keywords in _AXIS_KEYWORDS.items():
+        if any(kw in haystack for kw in keywords):
+            return axis
+    return "role"
+
+
+def project_fit_axes(
+    report: dict[str, Any], criteria: list[dict[str, Any]]
+) -> dict[str, float]:
+    """Project per-criterion scores onto three abstract axes.
+
+    Each axis = weighted mean of its bucketed criteria scores (0-100). Empty
+    axes fall back to the overall score so nodes aren't pinned to the origin.
+    """
+    buckets: dict[str, list[tuple[float, float]]] = {"role": [], "culture": [], "growth": []}
+    by_key = {c["key"]: c for c in criteria}
+    scores = report.get("criterionScores", {})
+    for key, val in scores.items():
+        crit = by_key.get(key)
+        if not crit:
+            continue
+        axis = _bucket_for(crit)
+        buckets[axis].append((float(val.get("score", 0)), float(crit.get("weight", 0))))
+
+    fallback = float(report.get("overallScore", 50))
+    out: dict[str, float] = {}
+    for axis, entries in buckets.items():
+        total_w = sum(w for _, w in entries)
+        if total_w <= 0:
+            out[axis] = fallback
+        else:
+            out[axis] = round(sum(s * w for s, w in entries) / total_w, 1)
+    return out
