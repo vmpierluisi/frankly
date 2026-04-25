@@ -4,6 +4,7 @@ import { COLORS, FONT_DISPLAY, GLOBAL_CSS } from "./design.js";
 import { setSessionGetter } from "./api.js";
 import { useAuth } from "./lib/auth.js";
 import { supabase } from "./lib/supabase.js";
+import CandidateDashboard from "./pages/CandidateDashboard.jsx";
 import CandidateIntake from "./pages/CandidateIntake.jsx";
 import CandidateProfile from "./pages/CandidateProfile.jsx";
 import ManagerDashboard from "./pages/ManagerDashboard.jsx";
@@ -40,6 +41,14 @@ export default function App() {
         <Route path="/" element={<RootRedirect auth={auth} />} />
 
         {/* Candidate-gated */}
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth auth={auth} role="candidate">
+              <CandidateDashboard />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/intake/*"
           element={
@@ -91,7 +100,7 @@ function RootRedirect({ auth }) {
     } else if (auth.role === "manager") {
       nav("/manager", { replace: true });
     } else {
-      nav("/intake", { replace: true });
+      nav("/dashboard", { replace: true });
     }
   }, [auth.user, auth.role, nav]);
   return null;
@@ -154,11 +163,11 @@ function Masthead({ auth }) {
       <div className="nav-bar">
         {auth.user && auth.role === "candidate" && (
           <>
+            <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+              Dashboard
+            </NavLink>
             <NavLink to="/intake" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
               Intake
-            </NavLink>
-            <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-              My profile
             </NavLink>
           </>
         )}

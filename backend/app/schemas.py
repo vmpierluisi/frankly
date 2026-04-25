@@ -71,13 +71,46 @@ class CandidateOut(BaseModel):
     persona: PersonaSummary | None = None
 
 
+class CandidateMeOut(BaseModel):
+    """Full self-view for authenticated candidates."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    auth_user_id: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+    cv_path: str | None = None
+    linkedin_url: str | None = None
+    github_url: str | None = None
+    assessment_status: str = "pending"
+    is_seed: bool = False
+    created_at: datetime
+    updated_at: datetime
+    persona: PersonaSummary | None = None
+
+
+class CandidateMePatchIn(BaseModel):
+    display_name: str | None = None
+    linkedin_url: str | None = None
+    github_url: str | None = None
+    cv_path: str | None = None
+
+
+class AssessmentSubmitIn(BaseModel):
+    bfi_responses: dict[str, int] = Field(default_factory=dict)
+    sjt_responses: dict[str, str] = Field(default_factory=dict)
+
+
 class CandidateListItem(BaseModel):
     """Slim row for the manager's candidate list."""
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     display_name: str | None = None
+    email: str | None = None
     narrative: str | None = None
+    assessment_status: str = "pending"
+    is_seed: bool = False
     created_at: datetime
 
 

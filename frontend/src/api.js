@@ -52,11 +52,23 @@ async function request(
 // ---------- Candidate endpoints ----------
 export const candidates = {
   getInstruments: () => request("/candidates/instruments"),
+  // Legacy anonymous intake (kept for backwards compat)
   create: (payload) => request("/candidates", { method: "POST", body: payload }),
   get: (id) => request(`/candidates/${id}`),
   update: (id, payload) =>
     request(`/candidates/${id}`, { method: "PATCH", body: payload }),
-  list: () => request("/candidates", { auth: true }),
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null))
+    ).toString();
+    return request(`/candidates${qs ? `?${qs}` : ""}`, { auth: true });
+  },
+  // Authenticated self-service
+  me: () => request("/candidates/me", { auth: true }),
+  updateMe: (payload) =>
+    request("/candidates/me", { method: "PATCH", body: payload, auth: true }),
+  submitAssessment: (payload) =>
+    request("/candidates/me/assessment", { method: "POST", body: payload, auth: true }),
 };
 
 // ---------- Company endpoints ----------

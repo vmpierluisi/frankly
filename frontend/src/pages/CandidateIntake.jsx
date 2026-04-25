@@ -2,15 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { candidates } from "../api.js";
-
-const _CID_KEY = "parallax:candidate-id";
-const _setCandidateId = (id) => id && localStorage.setItem(_CID_KEY, id);
 import { GeneratingScreen, Pillar } from "../components/Widgets.jsx";
-
-// Visual structure ported from hiring-sim-demo.jsx.
-// Delta from the JSX: matching now happens server-side and only when the
-// manager triggers it (blind matching). Candidate finishes the quiz and is
-// taken to a "submitted" confirmation, then to their persistent profile.
 
 export default function CandidateIntake() {
   const nav = useNavigate();
@@ -28,11 +20,10 @@ export default function CandidateIntake() {
     setStep("submitting");
     setError("");
     try {
-      const cand = await candidates.create({
+      await candidates.submitAssessment({
         bfi_responses: bfiResponses,
         sjt_responses: sjtResponses,
       });
-      _setCandidateId(cand.id);
       setStep("submitted");
     } catch (e) {
       setError(e.message);
@@ -74,7 +65,7 @@ export default function CandidateIntake() {
         />
       )}
       {step === "submitting" && <GeneratingScreen note="Submitting your responses…" />}
-      {step === "submitted" && <SubmittedScreen onContinue={() => nav("/profile")} />}
+      {step === "submitted" && <SubmittedScreen onContinue={() => nav("/dashboard")} />}
     </main>
   );
 }
@@ -269,11 +260,7 @@ function SubmittedScreen({ onContinue }) {
         on your profile page to opt in or decline. Until then, neither of you knows which
         company is on the other side.
       </p>
-      <p style={{ fontSize: 16, color: COLORS.muted, marginBottom: 32 }}>
-        Bookmark this browser. We've stored a private identifier locally so you can return
-        to your profile anytime without signing up. No password, no email required.
-      </p>
-      <button className="primary" onClick={onContinue}>View my profile →</button>
+      <button className="primary" onClick={onContinue}>Go to my dashboard →</button>
     </div>
   );
 }
