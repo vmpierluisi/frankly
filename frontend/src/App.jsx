@@ -8,6 +8,7 @@ import CandidateDashboard from "./pages/CandidateDashboard.jsx";
 import CandidateIntake from "./pages/CandidateIntake.jsx";
 import CandidateProfile from "./pages/CandidateProfile.jsx";
 import ManagerDashboard from "./pages/ManagerDashboard.jsx";
+import ScenarioLibraryPage from "./pages/ScenarioLibraryPage.jsx";
 import SyntheticTeamPage from "./pages/SyntheticTeamPage.jsx";
 import TemplateSetup from "./pages/TemplateSetup.jsx";
 import Login from "./pages/Login.jsx";
@@ -89,6 +90,14 @@ export default function App() {
           element={
             <RequireAuth auth={auth} role="manager">
               <SyntheticTeamPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/manager/companies/:companyId/scenarios"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <ScenarioLibraryPage />
             </RequireAuth>
           }
         />

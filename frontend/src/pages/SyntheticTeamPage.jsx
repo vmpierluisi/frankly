@@ -99,14 +99,23 @@ export default function SyntheticTeamPage() {
           )}
         </div>
 
-        <button
-          className="primary"
-          onClick={handleSynthesize}
-          disabled={synthesizing}
-          style={{ whiteSpace: "nowrap" }}
-        >
-          {synthesizing ? "Generating…" : teammates.length > 0 ? "Regenerate team" : "Generate team"}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            className="ghost"
+            onClick={() => nav(`/manager/companies/${companyId}/scenarios`)}
+            style={{ padding: "12px 20px" }}
+          >
+            Scenarios →
+          </button>
+          <button
+            className="primary"
+            onClick={handleSynthesize}
+            disabled={synthesizing}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {synthesizing ? "Generating…" : teammates.length > 0 ? "Regenerate team" : "Generate team"}
+          </button>
+        </div>
       </div>
 
       <p style={{ color: COLORS.muted, fontStyle: "italic", fontSize: 15, margin: "0 0 8px" }}>
