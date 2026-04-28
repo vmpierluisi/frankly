@@ -27,6 +27,7 @@ dependencies = [
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
+    "aiosqlite>=0.20",
 ]
 
 [tool.setuptools.packages.find]
