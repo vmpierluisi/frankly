@@ -257,3 +257,55 @@ def seed_companies(db: Session) -> None:
             )
         db.add(company)
     db.commit()
+
+
+async def seed_scenarios_for_seed_companies(db: Session) -> None:
+    """One-time bootstrap: draft scenario libraries for seed companies if absent.
+
+    Idempotent. Safe on every boot. Requires a real OpenRouter key to run.
+    """
+    from .services.simulation import scenario_engine
+    from .services.simulation.cost_tracker import CostBudget
+
+    for company_id in ("meridian-capital", "kestrel-growth"):
+        company = db.get(models.Company, company_id)
+        if company is None:
+            continue
+        existing = (
+            db.query(models.MomentOfTruth)
+            .filter_by(company_id=company.id)
+            .count()
+        )
+        if existing > 0:
+            continue
+        budget = CostBudget(ceiling_usd=10.0)
+        scenarios = await scenario_engine.draft_scenarios(company, budget=budget)
+        for s in scenarios:
+            db.add(s)
+    db.commit()
+
+
+async def seed_teams_for_seed_companies(db: Session) -> None:
+    """One-time bootstrap: synthesize teammates for seed companies if absent.
+
+    Idempotent. Safe on every boot. Requires a real OpenRouter key to run.
+    """
+    from .services.simulation import team_synthesizer
+    from .services.simulation.cost_tracker import CostBudget
+
+    for company_id in ("meridian-capital", "kestrel-growth"):
+        company = db.get(models.Company, company_id)
+        if company is None:
+            continue
+        existing = (
+            db.query(models.SyntheticTeammate)
+            .filter_by(company_id=company.id)
+            .count()
+        )
+        if existing > 0:
+            continue
+        budget = CostBudget(ceiling_usd=10.0)
+        teammates = await team_synthesizer.synthesize(company, budget=budget)
+        for t in teammates:
+            db.add(t)
+    db.commit()

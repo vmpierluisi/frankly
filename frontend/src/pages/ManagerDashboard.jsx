@@ -21,6 +21,7 @@ const VIEW_MAP = "map";
 export default function ManagerDashboard() {
   const nav = useNavigate();
   const [companyList, setCompanyList] = useState([]);
+  const [seedCount, setSeedCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -36,9 +37,14 @@ export default function ManagerDashboard() {
   const tickerRef = useRef(null);
 
   useEffect(() => {
-    companies
-      .list()
-      .then(setCompanyList)
+    Promise.all([
+      companies.list(),
+      candidates.list({ is_seed: true }),
+    ])
+      .then(([cos, seeds]) => {
+        setCompanyList(cos);
+        setSeedCount(seeds.length);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -126,7 +132,24 @@ export default function ManagerDashboard() {
           marginBottom: 12,
         }}
       >
-        <div className="label-mono">Positions ({companyList.length})</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="label-mono">Positions ({companyList.length})</div>
+          {seedCount !== null && seedCount > 0 && (
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 10,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: COLORS.muted,
+                border: `1px solid ${COLORS.rule}`,
+                padding: "2px 8px",
+              }}
+            >
+              Seeded: {seedCount}
+            </div>
+          )}
+        </div>
         <button
           className="ghost"
           onClick={() => nav("/manager/templates")}
@@ -144,6 +167,7 @@ export default function ManagerDashboard() {
             selected={selectedCompany === c.id}
             onSelect={() => setSelectedCompany(c.id)}
             onEdit={(e) => { e.stopPropagation(); nav(`/manager/templates/${c.id}`); }}
+            onViewTeam={(e) => { e.stopPropagation(); nav(`/manager/companies/${c.id}/team`); }}
           />
         ))}
         {companyList.length === 0 && (
@@ -182,6 +206,15 @@ export default function ManagerDashboard() {
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {selectedCompany && (
+            <button
+              className="ghost"
+              onClick={() => nav(`/manager/companies/${selectedCompany}/team`)}
+              style={{ padding: "14px 20px" }}
+            >
+              View team
+            </button>
+          )}
           <button
             className="primary"
             onClick={() => runSearch(false)}
@@ -265,7 +298,7 @@ export default function ManagerDashboard() {
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function PositionCard({ company, selected, onSelect, onEdit }) {
+function PositionCard({ company, selected, onSelect, onEdit, onViewTeam }) {
   return (
     <div
       onClick={onSelect}
@@ -292,13 +325,22 @@ function PositionCard({ company, selected, onSelect, onEdit }) {
           </div>
         )}
       </div>
-      <button
-        className="ghost"
-        style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}
-        onClick={onEdit}
-      >
-        Edit
-      </button>
+      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        <button
+          className="ghost"
+          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
+          onClick={onViewTeam}
+        >
+          Team
+        </button>
+        <button
+          className="ghost"
+          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
+          onClick={onEdit}
+        >
+          Edit
+        </button>
+      </div>
     </div>
   );
 }

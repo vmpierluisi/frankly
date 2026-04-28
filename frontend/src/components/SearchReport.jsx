@@ -82,8 +82,28 @@ export default function SearchReport({ search, criteriaIndex }) {
                 >
                   {i + 1}
                 </div>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: COLORS.muted }}>
-                  {r.candidate_id.slice(0, 8)}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: COLORS.muted }}>
+                    {r.display_name
+                      ? r.display_name.split(" ")[0]
+                      : r.candidate_id.slice(0, 8)}
+                  </div>
+                  {r.is_seed && (
+                    <div
+                      style={{
+                        fontFamily: FONT_MONO,
+                        fontSize: 9,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: COLORS.muted,
+                        border: `1px solid ${COLORS.rule}`,
+                        padding: "1px 5px",
+                        width: "fit-content",
+                      }}
+                    >
+                      seed
+                    </div>
+                  )}
                 </div>
                 <div
                   style={{
