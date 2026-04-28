@@ -1,13 +1,18 @@
 """Candidate intake + profile + list + authenticated self-service endpoints."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import CurrentUser, require_candidate, require_manager
+from ..config import settings
 from ..db import get_session
 from ..services.persona import synthesize_persona
+from ..services.simulation.cost_tracker import CostBudget
+from ..services.simulation.persona_aggregator import aggregate
 from ..seed_data import BFI10, SJTS
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -116,6 +121,104 @@ def submit_assessment(
     db.commit()
     db.refresh(candidate)
     return _to_me_out(candidate)
+
+
+# ---------------------------------------------------------------------------
+# Candidate self-service — persona aggregation (simulation pipeline)
+# ---------------------------------------------------------------------------
+@router.post(
+    "/me/persona/aggregate",
+    response_model=schemas.AggregatedPersonaOut,
+    summary="Trigger aggregated persona generation for the signed-in candidate.",
+)
+async def aggregate_my_persona(
+    user: CurrentUser = Depends(require_candidate),
+    db: Session = Depends(get_session),
+) -> schemas.AggregatedPersonaOut:
+    """Run the persona aggregator over all available evidence sources and
+    cache the result on the candidate row.  Re-running overwrites the cache.
+    """
+    candidate = (
+        db.query(models.Candidate)
+        .filter(models.Candidate.auth_user_id == user.auth_user_id)
+        .first()
+    )
+    if candidate is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found — call GET /me first.",
+        )
+    if candidate.assessment_status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Assessment not yet completed. "
+                "Submit BFI + SJT responses via POST /me/assessment first."
+            ),
+        )
+
+    budget = CostBudget(ceiling_usd=settings.match_cost_ceiling_usd)
+    try:
+        persona = await aggregate(candidate, budget=budget)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Persona aggregation failed: {exc}",
+        ) from exc
+
+    now = datetime.now(timezone.utc)
+    candidate.aggregated_persona = persona
+    candidate.aggregation_audit = {
+        "evidence_completeness": persona.get("evidence_completeness"),
+        "aggregator_version": persona.get("aggregator_version"),
+        "n_provenance_claims": len(persona.get("provenance_map", [])),
+        "n_inconsistencies": len(persona.get("inconsistencies", [])),
+        "llm_calls": budget.calls_made,
+        "tokens_in": budget.tokens_in,
+        "tokens_out": budget.tokens_out,
+        "cost_usd": round(budget.spent_usd, 6),
+    }
+    candidate.aggregated_at = now
+    db.commit()
+    db.refresh(candidate)
+
+    return schemas.AggregatedPersonaOut(
+        aggregated_persona=candidate.aggregated_persona,
+        aggregation_audit=candidate.aggregation_audit,
+        aggregated_at=candidate.aggregated_at,
+    )
+
+
+@router.get(
+    "/me/persona",
+    response_model=schemas.AggregatedPersonaOut,
+    summary="Return the cached aggregated persona for the signed-in candidate.",
+)
+def get_my_persona(
+    user: CurrentUser = Depends(require_candidate),
+    db: Session = Depends(get_session),
+) -> schemas.AggregatedPersonaOut:
+    """Return the cached aggregated persona.  404 if not yet aggregated."""
+    candidate = (
+        db.query(models.Candidate)
+        .filter(models.Candidate.auth_user_id == user.auth_user_id)
+        .first()
+    )
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+    if candidate.aggregated_persona is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No aggregated persona found. "
+                "Trigger aggregation via POST /me/persona/aggregate first."
+            ),
+        )
+    return schemas.AggregatedPersonaOut(
+        aggregated_persona=candidate.aggregated_persona,
+        aggregation_audit=candidate.aggregation_audit,
+        aggregated_at=candidate.aggregated_at,
+    )
 
 
 # ---------------------------------------------------------------------------

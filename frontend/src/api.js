@@ -69,6 +69,10 @@ export const candidates = {
     request("/candidates/me", { method: "PATCH", body: payload, auth: true }),
   submitAssessment: (payload) =>
     request("/candidates/me/assessment", { method: "POST", body: payload, auth: true }),
+  aggregatePersona: () =>
+    request("/candidates/me/persona/aggregate", { method: "POST", auth: true }),
+  getPersona: () =>
+    request("/candidates/me/persona", { auth: true }),
 };
 
 // ---------- Company endpoints ----------
@@ -120,6 +124,26 @@ export const matches = {
     return request(`/matches${qs ? `?${qs}` : ""}`, { auth: true });
   },
   get: (id) => request(`/matches/${id}`, { auth: true }),
+};
+
+// ---------- Synthetic team ----------
+export const team = {
+  list: (companyId) =>
+    request(`/companies/${companyId}/team`, { auth: true }),
+  synthesize: (companyId) =>
+    request(`/companies/${companyId}/team/synthesize`, { method: "POST", auth: true }),
+  update: (companyId, teammateId, payload) =>
+    request(`/companies/${companyId}/team/${teammateId}`, {
+      method: "PATCH",
+      body: payload,
+      auth: true,
+    }),
+  remove: (companyId, teammateId) =>
+    request(`/companies/${companyId}/team/${teammateId}`, {
+      method: "DELETE",
+      auth: true,
+      raw: true,
+    }),
 };
 
 export const API_BASE = BASE;

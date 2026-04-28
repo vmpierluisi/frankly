@@ -147,6 +147,7 @@ async def search_candidates(
         items.append(
             schemas.SearchMatchResultItem(
                 candidate_id=candidate.id,
+                display_name=candidate.display_name,
                 narrative=candidate.cached_narrative,
                 overall_score=report["overallScore"],
                 band=report["band"],
@@ -154,6 +155,7 @@ async def search_candidates(
                 report=report,
                 fit_axes=schemas.FitAxes(**axes),
                 cached=cached,
+                is_seed=candidate.is_seed,
             )
         )
     items.sort(key=lambda r: r.overall_score, reverse=True)

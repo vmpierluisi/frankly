@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # --- Simulation pipeline ---
+    sim_rollouts_concurrency: int = 5
+    sim_judges_per_rollout: int = 2
+    sim_max_turns_dyad: int = 6
+    sim_max_turns_small_group: int = 10
+    sim_max_turns_written: int = 4
+    sim_default_team_size: int = 5
+    sim_match_wall_timeout_s: int = 900
+    sim_rollout_wall_timeout_s: int = 300
+    match_cost_ceiling_usd: float = 5.0
+    openrouter_global_concurrency: int = 16
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]

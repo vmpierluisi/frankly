@@ -101,6 +101,13 @@ class AssessmentSubmitIn(BaseModel):
     sjt_responses: dict[str, str] = Field(default_factory=dict)
 
 
+class AggregatedPersonaOut(BaseModel):
+    """Response for GET/POST /candidates/me/persona endpoints."""
+    aggregated_persona: dict[str, Any]
+    aggregation_audit: dict[str, Any] | None = None
+    aggregated_at: datetime
+
+
 class CandidateListItem(BaseModel):
     """Slim row for the manager's candidate list."""
     model_config = ConfigDict(from_attributes=True)
@@ -227,6 +234,7 @@ class FitAxes(BaseModel):
 
 class SearchMatchResultItem(BaseModel):
     candidate_id: str
+    display_name: str | None = None
     narrative: str | None = None
     overall_score: int
     band: str
@@ -234,6 +242,7 @@ class SearchMatchResultItem(BaseModel):
     report: dict[str, Any]
     fit_axes: FitAxes
     cached: bool
+    is_seed: bool = False
 
 
 class SearchMatchOut(BaseModel):
@@ -257,6 +266,83 @@ class MatchOut(BaseModel):
     candidate_opt_in: bool | None = None
     manager_opt_in: bool | None = None
     created_at: datetime
+
+
+# ----------------------------------------------------------------------------
+# Scenario library
+# ----------------------------------------------------------------------------
+class MomentOfTruthOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    company_id: str
+    title: str
+    scenario_type: str
+    prompt: str
+    candidate_role: str
+    expected_arc: str
+    scoring_dims: list[str]
+    participating_roles: list[str]
+    max_turns: int
+    grounding: str
+    is_llm_drafted: bool
+    ordering: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class MomentOfTruthIn(BaseModel):
+    title: str
+    scenario_type: str
+    prompt: str
+    candidate_role: str
+    expected_arc: str
+    scoring_dims: list[str] = Field(default_factory=list)
+    participating_roles: list[str] = Field(default_factory=list)
+    max_turns: int = 6
+    grounding: str = ""
+
+
+class MomentOfTruthPatch(BaseModel):
+    title: str | None = None
+    scenario_type: str | None = None
+    prompt: str | None = None
+    candidate_role: str | None = None
+    expected_arc: str | None = None
+    scoring_dims: list[str] | None = None
+    participating_roles: list[str] | None = None
+    max_turns: int | None = None
+    grounding: str | None = None
+
+
+# ----------------------------------------------------------------------------
+# Synthetic team
+# ----------------------------------------------------------------------------
+class SyntheticTeammateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    company_id: str
+    name: str
+    role_on_team: str
+    seniority: str
+    trait_sheet: dict[str, Any]
+    narrative: str
+    private_goals: list[str]
+    generated_from: dict[str, Any] | None = None
+    is_edited: bool
+    ordering: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class SyntheticTeammatePatch(BaseModel):
+    name: str | None = None
+    role_on_team: str | None = None
+    seniority: str | None = None
+    trait_sheet: dict[str, Any] | None = None
+    narrative: str | None = None
+    private_goals: list[str] | None = None
 
 
 # ----------------------------------------------------------------------------

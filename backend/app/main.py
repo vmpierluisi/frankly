@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import SessionLocal, init_db
-from .routes import candidates, companies, matches, templates
+from .routes import candidates, companies, matches, scenarios, team, templates
 from .schemas import HealthOut
 from .seed_data import seed_companies
 
@@ -67,3 +67,5 @@ app.include_router(candidates.router)
 app.include_router(companies.router)
 app.include_router(templates.router)
 app.include_router(matches.router)
+app.include_router(team.router)
+app.include_router(scenarios.router)
