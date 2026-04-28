@@ -207,13 +207,22 @@ export default function ManagerDashboard() {
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {selectedCompany && (
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/companies/${selectedCompany}/team`)}
-              style={{ padding: "14px 20px" }}
-            >
-              View team
-            </button>
+            <>
+              <button
+                className="ghost"
+                onClick={() => nav(`/manager/companies/${selectedCompany}/team`)}
+                style={{ padding: "14px 20px" }}
+              >
+                Team
+              </button>
+              <button
+                className="ghost"
+                onClick={() => nav(`/manager/companies/${selectedCompany}/scenarios`)}
+                style={{ padding: "14px 20px" }}
+              >
+                Scenarios
+              </button>
+            </>
           )}
           <button
             className="primary"

@@ -126,6 +126,24 @@ export const matches = {
   get: (id) => request(`/matches/${id}`, { auth: true }),
 };
 
+// ---------- Scenario library ----------
+export const scenarios = {
+  list: (companyId) =>
+    request(`/companies/${companyId}/scenarios`, { auth: true }),
+  draft: (companyId) =>
+    request(`/companies/${companyId}/scenarios/draft`, { method: "POST", auth: true }),
+  create: (companyId, payload) =>
+    request(`/companies/${companyId}/scenarios`, { method: "POST", body: payload, auth: true }),
+  update: (companyId, scenarioId, payload) =>
+    request(`/companies/${companyId}/scenarios/${scenarioId}`, {
+      method: "PATCH", body: payload, auth: true,
+    }),
+  remove: (companyId, scenarioId) =>
+    request(`/companies/${companyId}/scenarios/${scenarioId}`, {
+      method: "DELETE", auth: true, raw: true,
+    }),
+};
+
 // ---------- Synthetic team ----------
 export const team = {
   list: (companyId) =>
