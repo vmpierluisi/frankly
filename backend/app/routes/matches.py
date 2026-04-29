@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import require_manager
 from ..db import get_session
-from ..services.matcher import project_fit_axes, run_match
+from ..services.baseline_matcher import project_fit_axes
+from ..services.baseline_matcher import run_match as baseline_run_match
 from ..services.persona import synthesize_persona
+from ..services.simulation import simulation_matcher
 
 router = APIRouter(
     prefix="/matches",
@@ -57,20 +59,30 @@ async def trigger_match(
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    persona = synthesize_persona(candidate.bfi_responses or {}, candidate.sjt_responses or {})
-    company_dict = _company_to_dict(company)
-
-    report = await run_match(persona=persona, company=company_dict)
-
+    # Create Match row first so simulation_matcher can write logs against its id.
     match = models.Match(
         candidate_id=candidate.id,
         company_id=company.id,
-        overall_score=report["overallScore"],
-        band=report["band"],
-        band_note=report["bandNote"],
-        report=report,
+        overall_score=0,
+        band="",
+        band_note="",
+        report={},
     )
     db.add(match)
+    db.flush()
+
+    report = await simulation_matcher.run_match(
+        match_id=match.id,
+        candidate=candidate,
+        company=company,
+        db=db,
+    )
+
+    match.overall_score = report["overallScore"]
+    match.band = report["band"]
+    match.band_note = report.get("bandNote", "")
+    match.report = report
+
     db.commit()
     db.refresh(match)
 
@@ -120,7 +132,7 @@ async def search_candidates(
             persona = synthesize_persona(
                 candidate.bfi_responses or {}, candidate.sjt_responses or {}
             )
-            report = await run_match(persona=persona, company=company_dict)
+            report = await baseline_run_match(persona=persona, company=company_dict)
         return candidate, report, False
 
     scored = await asyncio.gather(*(score_candidate(c) for c in candidates))

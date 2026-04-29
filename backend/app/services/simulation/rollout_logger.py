@@ -11,7 +11,7 @@ from typing import Any, TYPE_CHECKING
 from ...models import RolloutLog
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import Session
 
 
 async def log_event(
@@ -20,7 +20,7 @@ async def log_event(
     event_type: str,
     payload: dict[str, Any],
     *,
-    db: "AsyncSession",
+    db: "Session",
 ) -> None:
     """Append a single event row to rollout_logs.
 
