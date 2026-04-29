@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_AGENT_MODEL = "google/gemma-4-31b-it"
+
 # ---------------------------------------------------------------------------
 # Prompt templates (verbatim from brief Appendix A.6)
 # ---------------------------------------------------------------------------
@@ -236,6 +238,7 @@ async def advance_turn(
         schema_name="agent_turn",
         temperature=0.7,
         max_tokens=600,
+        model=_AGENT_MODEL,
     )
 
     turn_record: dict[str, Any] = {
