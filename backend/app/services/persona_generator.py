@@ -128,7 +128,7 @@ Remember: BFI values are integers 1–5; SJT options are exactly a/b/c/d."""
         user=user_msg,
         schema=_RESPONSE_SCHEMA,
         schema_name="synthetic_candidate",
-        model="anthropic/claude-haiku-4-5",
+        model="google/gemma-4-31b-it",
         temperature=0.9,
         max_tokens=400,
     )
