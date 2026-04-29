@@ -124,6 +124,12 @@ export const matches = {
     return request(`/matches${qs ? `?${qs}` : ""}`, { auth: true });
   },
   get: (id) => request(`/matches/${id}`, { auth: true }),
+  listRollouts: (matchId) =>
+    request(`/matches/${matchId}/rollouts`, { auth: true }),
+  getRollout: (matchId, rolloutId) =>
+    request(`/matches/${matchId}/rollouts/${rolloutId}`, { auth: true }),
+  getBaseline: (matchId) =>
+    request(`/matches/${matchId}/baseline`, { auth: true }),
 };
 
 // ---------- Scenario library ----------
