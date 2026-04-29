@@ -181,6 +181,81 @@ async def search_candidates(
     )
 
 
+@router.get("/{match_id}/rollouts", response_model=list[schemas.RolloutSummaryOut])
+def list_rollouts(
+    match_id: str,
+    db: Session = Depends(get_session),
+) -> list[schemas.RolloutSummaryOut]:
+    match = db.get(models.Match, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    from sqlalchemy import select
+    rollouts = db.execute(
+        select(models.Rollout)
+        .where(models.Rollout.match_id == match_id)
+        .order_by(models.Rollout.rollout_index)
+    ).scalars().all()
+
+    result = []
+    for r in rollouts:
+        scores = db.execute(
+            select(models.RolloutScore).where(models.RolloutScore.rollout_id == r.id)
+        ).scalars().all()
+        scores_dict = {s.dimension_key: s.score for s in scores if s.score is not None}
+        result.append(schemas.RolloutSummaryOut(
+            id=r.id,
+            match_id=r.match_id,
+            scenario_id=r.scenario_id,
+            rollout_index=r.rollout_index,
+            status=r.status,
+            failure_reason=r.failure_reason,
+            duration_turns=r.duration_turns,
+            headline=r.final_state.get("transcript_summary", ""),
+            scores=scores_dict,
+            created_at=r.created_at,
+        ))
+    return result
+
+
+@router.get("/{match_id}/rollouts/{rollout_id}", response_model=schemas.RolloutDetailOut)
+def get_rollout(
+    match_id: str,
+    rollout_id: str,
+    db: Session = Depends(get_session),
+) -> schemas.RolloutDetailOut:
+    rollout = db.get(models.Rollout, rollout_id)
+    if rollout is None or rollout.match_id != match_id:
+        raise HTTPException(status_code=404, detail="Rollout not found")
+    from sqlalchemy import select
+    score_rows = db.execute(
+        select(models.RolloutScore).where(models.RolloutScore.rollout_id == rollout_id)
+    ).scalars().all()
+    return schemas.RolloutDetailOut(
+        id=rollout.id,
+        match_id=rollout.match_id,
+        scenario_id=rollout.scenario_id,
+        rollout_index=rollout.rollout_index,
+        status=rollout.status,
+        failure_reason=rollout.failure_reason,
+        duration_turns=rollout.duration_turns,
+        transcript=rollout.transcript,
+        final_state=rollout.final_state,
+        score_rows=[schemas.RolloutScoreOut.model_validate(s) for s in score_rows],
+        created_at=rollout.created_at,
+    )
+
+
+@router.get("/{match_id}/baseline", response_model=schemas.BaselineComparisonOut)
+def get_baseline(
+    match_id: str,
+    db: Session = Depends(get_session),
+) -> schemas.BaselineComparisonOut:
+    row = db.get(models.BaselineComparison, match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="No baseline comparison for this match")
+    return schemas.BaselineComparisonOut.model_validate(row)
+
+
 @router.get("", response_model=list[schemas.MatchOut])
 def list_matches(
     candidate_id: str | None = None,

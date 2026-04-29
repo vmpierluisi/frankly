@@ -2,6 +2,14 @@ import React, { useMemo, useState } from "react";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { ScoreBar } from "./Widgets.jsx";
 import FitReport from "./FitReport.jsx";
+import FitProfileV2 from "./FitProfileV2.jsx";
+
+function FitReportShell({ report, criteriaIndex, onOpenRollout }) {
+  if (report?.version === "v2") {
+    return <FitProfileV2 report={report} criteriaIndex={criteriaIndex} onOpenRollout={onOpenRollout} />;
+  }
+  return <FitReport report={report} criteriaIndex={criteriaIndex} />;
+}
 
 // Ranked candidates for a single position. Each row shows absolute fit (raw
 // 0-100) and relative fit (rank in pool + percentile). Click expands the
@@ -183,7 +191,7 @@ export default function SearchReport({ search, criteriaIndex }) {
                     borderTop: `1px solid ${COLORS.rule}`,
                   }}
                 >
-                  <FitReport report={r.report} criteriaIndex={criteriaIndex} />
+                  <FitReportShell report={r.report} criteriaIndex={criteriaIndex} />
                 </div>
               )}
             </div>

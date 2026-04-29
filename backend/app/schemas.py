@@ -346,6 +346,63 @@ class SyntheticTeammatePatch(BaseModel):
 
 
 # ----------------------------------------------------------------------------
+# Simulation pipeline — rollout read endpoints
+# ----------------------------------------------------------------------------
+class RolloutScoreOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    dimension_key: str
+    score: int | None = None
+    confidence: float
+    justification: str
+    evidence_turns: list[int]
+
+
+class RolloutSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    match_id: str
+    scenario_id: str | None = None
+    rollout_index: int
+    status: str
+    failure_reason: str | None = None
+    duration_turns: int
+    headline: str
+    scores: dict[str, Any]
+    created_at: datetime
+
+
+class RolloutDetailOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    match_id: str
+    scenario_id: str | None = None
+    rollout_index: int
+    status: str
+    failure_reason: str | None = None
+    duration_turns: int
+    transcript: list[Any]
+    final_state: dict[str, Any]
+    score_rows: list[RolloutScoreOut]
+    created_at: datetime
+
+
+class BaselineComparisonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    match_id: str
+    overall_score: int
+    per_criterion: dict[str, Any]
+    band: str
+    band_note: str
+    delta_vs_sim: dict[str, Any]
+    robustness_summary: str
+    created_at: datetime
+
+
+# ----------------------------------------------------------------------------
 # Misc
 # ----------------------------------------------------------------------------
 class HealthOut(BaseModel):
