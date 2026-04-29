@@ -1,11 +1,14 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import DimensionalFitChart from "./DimensionalFitChart.jsx";
 import BaselineCompareStrip from "./BaselineCompareStrip.jsx";
 import RolloutSummaryCard from "./RolloutSummaryCard.jsx";
 
 export default function FitProfileV2({ report, criteriaIndex = {}, onOpenRollout }) {
+  const navigate = useNavigate();
   const {
+    matchId,
     overallScore,
     band,
     bandNote,
@@ -90,7 +93,10 @@ export default function FitProfileV2({ report, criteriaIndex = {}, onOpenRollout
               <RolloutSummaryCard
                 key={s.rolloutId}
                 summary={s}
-                onClick={onOpenRollout || (() => {})}
+                onClick={(rolloutId) => {
+                  if (onOpenRollout) return onOpenRollout(rolloutId);
+                  if (matchId) navigate(`/manager/matches/${matchId}/rollouts/${rolloutId}`);
+                }}
               />
             ))}
           </div>

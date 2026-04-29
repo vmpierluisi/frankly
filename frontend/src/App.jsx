@@ -11,6 +11,7 @@ import ManagerDashboard from "./pages/ManagerDashboard.jsx";
 import ScenarioLibraryPage from "./pages/ScenarioLibraryPage.jsx";
 import SyntheticTeamPage from "./pages/SyntheticTeamPage.jsx";
 import TemplateSetup from "./pages/TemplateSetup.jsx";
+import TranscriptViewer from "./pages/TranscriptViewer.jsx";
 import Login from "./pages/Login.jsx";
 
 // Wire the session getter into the API module once at startup.
@@ -98,6 +99,15 @@ export default function App() {
           element={
             <RequireAuth auth={auth} role="manager">
               <ScenarioLibraryPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/manager/matches/:matchId/rollouts/:rolloutId"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <TranscriptViewer />
             </RequireAuth>
           }
         />
