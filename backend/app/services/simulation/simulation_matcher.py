@@ -313,6 +313,7 @@ async def run_match(
         all_rollouts,
         list(all_scores),
         criteria,
+        match_id=match_id,
         company_id=company.id,
         company_name=company.name,
         role=company.role,

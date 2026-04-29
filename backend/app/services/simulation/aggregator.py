@@ -34,6 +34,7 @@ def aggregate_fit_profile(
     scores: "list[RolloutScore]",
     criteria: list[dict[str, Any]],
     *,
+    match_id: str = "",
     company_id: str = "",
     company_name: str = "",
     role: str = "",
@@ -213,6 +214,7 @@ def aggregate_fit_profile(
     # -----------------------------------------------------------------------
     profile: dict[str, Any] = {
         # Legacy fields
+        "matchId": match_id,
         "companyId": company_id,
         "companyName": company_name,
         "role": role,
