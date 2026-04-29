@@ -1,64 +1,56 @@
-"""Unit + integration tests for services/simulation/rollout.py — Phase 4A.
+"""Integration tests for services/simulation/rollout.py — Phase 4B/4C.
 
 Validation gate:
   (1) execute_rollout() returns a Rollout ORM object with correct fields.
   (2) Rollout.transcript contains the turn history.
   (3) Rollout.status == "completed" on normal exit.
-  (4) Rollout.status == "aborted" when CostCeilingExceeded is raised.
-  (5) Mock RolloutScore stubs are created for each scoring dimension.
-  (6) RolloutLog rows are written (rollout_started, turn_completed, rollout_ended, judge_scored).
+  (4) Rollout.status == "aborted" when CostCeilingExceeded is raised by agent.
+  (5) RolloutScore rows are created with real scores from the judge.
+  (6) RolloutLog rows are written (rollout_started, rollout_ended, judge_scored).
   (7) ends_turn=True signal stops the loop early.
   (8) Loop stops at max_turns even without ends_turn signal.
+  (9) transcript_summary is stored in rollout.final_state.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from app.db import Base
-from app.models import Rollout, RolloutScore, RolloutLog
+from app.models import Rollout, RolloutLog, RolloutScore
 from app.services.simulation.rollout import execute_rollout
 from app.services.simulation.cost_tracker import CostBudget, CostCeilingExceeded
 
 
 # ---------------------------------------------------------------------------
-# Async SQLite fixture
+# Sync DB fixture (execute_rollout uses sync Session)
 # ---------------------------------------------------------------------------
 
-@pytest_asyncio.fixture()
-async def async_db():
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+@pytest.fixture()
+def db_session():
+    engine = create_engine(
+        "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    Session = async_sessionmaker(engine, expire_on_commit=False)
-    async with Session() as session:
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    session = Session()
+    try:
         yield session
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
-# Stub objects
+# Stubs
 # ---------------------------------------------------------------------------
-
-class _StubCriterion:
-    def __init__(self, key):
-        self.key = key
-        self.label = key
-        self.weight = 0.25
-
 
 class _StubScenario:
     id = "scen-001"
@@ -74,11 +66,14 @@ class _StubScenario:
     is_llm_drafted = True
 
 
+_CRITERIA = [
+    {"key": "written_rigor", "label": "Written Rigor", "description": "Structures arguments clearly."},
+    {"key": "decisiveness", "label": "Decisiveness", "description": "Makes calls without hedging."},
+]
+
 _CANDIDATE_PERSONA = {
     "narrative": "Strong analytical background.",
-    "structured_traits": {
-        "big_five": {"openness": 4.0, "conscientiousness": 4.5},
-    },
+    "structured_traits": {"big_five": {"openness": 4.0}},
 }
 
 _TEAMMATES = [
@@ -93,23 +88,21 @@ _TEAMMATES = [
     }
 ]
 
-_STUB_TURN = {
-    "utterance": "Hello.",
-    "intent": "open",
-    "internal_state": "calm",
-    "ends_turn": False,
-}
-
+_STUB_TURN = {"utterance": "Hello.", "intent": "open", "internal_state": "calm", "ends_turn": False}
 _STUB_TURN_ENDS = {**_STUB_TURN, "ends_turn": True}
-
 _STUB_MATCH_ID = "match-001"
 
+_JUDGE_RESPONSE = {
+    "dimension_scores": {
+        "written_rigor": {"score": 78, "justification": "Clear.", "evidence_turns": [0], "confidence": 0.8},
+        "decisiveness":  {"score": 82, "justification": "Direct.", "evidence_turns": [0], "confidence": 0.75},
+    },
+    "transcript_summary": "Candidate was clear and decisive.",
+    "judge_notes": "",
+}
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
-def _make_budget(ceiling: float = 1.0) -> CostBudget:
+def _make_budget(ceiling: float = 5.0) -> CostBudget:
     return CostBudget(ceiling_usd=ceiling)
 
 
@@ -118,19 +111,13 @@ def _make_budget(ceiling: float = 1.0) -> CostBudget:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_execute_rollout_returns_rollout_object(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN),
-    ):
+async def test_execute_rollout_returns_rollout_object(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert isinstance(rollout, Rollout)
@@ -139,19 +126,13 @@ async def test_execute_rollout_returns_rollout_object(async_db):
 
 
 @pytest.mark.asyncio
-async def test_execute_rollout_status_completed(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN),
-    ):
+async def test_execute_rollout_status_completed(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert rollout.status == "completed"
@@ -159,19 +140,13 @@ async def test_execute_rollout_status_completed(async_db):
 
 
 @pytest.mark.asyncio
-async def test_execute_rollout_transcript_populated(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN),
-    ):
+async def test_execute_rollout_transcript_populated(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert isinstance(rollout.transcript, list)
@@ -179,42 +154,29 @@ async def test_execute_rollout_transcript_populated(async_db):
 
 
 @pytest.mark.asyncio
-async def test_execute_rollout_stops_at_max_turns(async_db):
+async def test_execute_rollout_stops_at_max_turns(db_session):
     scenario = _StubScenario()
     scenario.max_turns = 2
 
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN),
-    ):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=scenario,
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=scenario,
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert rollout.duration_turns <= 2
 
 
 @pytest.mark.asyncio
-async def test_execute_rollout_stops_on_ends_turn(async_db):
-    # First call returns ends_turn=True — loop should stop after one turn.
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN_ENDS),
-    ):
+async def test_execute_rollout_stops_on_ends_turn(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN_ENDS)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert rollout.duration_turns == 1
@@ -222,19 +184,14 @@ async def test_execute_rollout_stops_on_ends_turn(async_db):
 
 
 @pytest.mark.asyncio
-async def test_execute_rollout_aborted_on_cost_ceiling(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(side_effect=CostCeilingExceeded("over budget")),
-    ):
+async def test_execute_rollout_aborted_on_cost_ceiling(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json",
+               new=AsyncMock(side_effect=CostCeilingExceeded("over budget"))), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
 
     assert rollout.status == "aborted"
@@ -242,56 +199,54 @@ async def test_execute_rollout_aborted_on_cost_ceiling(async_db):
 
 
 @pytest.mark.asyncio
-async def test_mock_rollout_scores_created(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN_ENDS),
-    ):
+async def test_rollout_scores_created_with_real_scores(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN_ENDS)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
         rollout = await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
-        await async_db.commit()
+        db_session.commit()
 
-    from sqlalchemy import select
-    rows = (await async_db.execute(
+    rows = db_session.execute(
         select(RolloutScore).where(RolloutScore.rollout_id == rollout.id)
-    )).scalars().all()
+    ).scalars().all()
 
-    assert len(rows) == 2  # one per scoring_dim ("written_rigor", "decisiveness")
+    assert len(rows) == 2
     dim_keys = {r.dimension_key for r in rows}
     assert "written_rigor" in dim_keys
     assert "decisiveness" in dim_keys
-    # Phase 4A scores are null stubs.
-    assert all(r.score is None for r in rows)
+    assert all(r.score is not None for r in rows)
 
 
 @pytest.mark.asyncio
-async def test_rollout_log_events_written(async_db):
-    with patch(
-        "app.services.simulation.agent_runtime.tracked_chat_json",
-        new=AsyncMock(return_value=_STUB_TURN_ENDS),
-    ):
-        await execute_rollout(
-            match_id=_STUB_MATCH_ID,
-            scenario=_StubScenario(),
-            candidate_persona=_CANDIDATE_PERSONA,
-            teammates=_TEAMMATES,
-            k_index=0,
-            db=async_db,
-            budget=_make_budget(),
+async def test_rollout_transcript_summary_stored(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN_ENDS)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
+        rollout = await execute_rollout(
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
         )
-        await async_db.commit()
 
-    from sqlalchemy import select
-    rows = (await async_db.execute(
+    assert rollout.final_state.get("transcript_summary") == "Candidate was clear and decisive."
+
+
+@pytest.mark.asyncio
+async def test_rollout_log_events_written(db_session):
+    with patch("app.services.simulation.agent_runtime.tracked_chat_json", new=AsyncMock(return_value=_STUB_TURN_ENDS)), \
+         patch("app.services.simulation.judge.tracked_chat_json", new=AsyncMock(return_value=_JUDGE_RESPONSE)):
+        await execute_rollout(
+            match_id=_STUB_MATCH_ID, scenario=_StubScenario(),
+            candidate_persona=_CANDIDATE_PERSONA, teammates=_TEAMMATES,
+            criteria=_CRITERIA, k_index=0, db=db_session, budget=_make_budget(),
+        )
+        db_session.commit()
+
+    rows = db_session.execute(
         select(RolloutLog).where(RolloutLog.match_id == _STUB_MATCH_ID)
-    )).scalars().all()
+    ).scalars().all()
 
     event_types = {r.event_type for r in rows}
     assert "rollout_started" in event_types
