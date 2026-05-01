@@ -295,6 +295,7 @@ async def score_rollout(
     try:
         raw_a = await tracked_chat_json(
             budget,
+            model=settings.openrouter_model,
             system=JUDGE_SYSTEM,
             user=user_prompt,
             schema=schema,
@@ -311,6 +312,7 @@ async def score_rollout(
         try:
             raw_b = await tracked_chat_json(
                 budget,
+                model=settings.openrouter_model,
                 system=JUDGE_SYSTEM,
                 user=user_prompt,
                 schema=schema,

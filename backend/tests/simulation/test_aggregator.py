@@ -145,8 +145,8 @@ def test_aggregate_overall_score_clipped():
 def test_aggregate_band_strong_fit():
     rollouts = [_StubRollout(id="r1")]
     scores = [
-        _StubScore(rollout_id="r1", dimension_key="analytical_rigor", score=90),
-        _StubScore(rollout_id="r1", dimension_key="decisiveness", score=90),
+        _StubScore(rollout_id="r1", dimension_key="analytical_rigor", score=80),
+        _StubScore(rollout_id="r1", dimension_key="decisiveness", score=80),
     ]
     profile = aggregate_fit_profile(rollouts, scores, _CRITERIA)
     assert profile["band"] == "Strong fit"
@@ -159,7 +159,7 @@ def test_aggregate_band_low_fit():
         _StubScore(rollout_id="r1", dimension_key="decisiveness", score=20),
     ]
     profile = aggregate_fit_profile(rollouts, scores, _CRITERIA)
-    assert profile["band"] == "Low fit"
+    assert profile["band"] == "Poor fit"
 
 
 def test_aggregate_rollout_summaries_sorted_by_index():
@@ -245,10 +245,14 @@ def test_aggregate_no_rollouts_returns_zero_overall():
 
 
 def test_band_for_thresholds():
-    assert _band_for(80)[0] == "Strong fit"
+    assert _band_for(95)[0] == "Exceptional fit"
+    assert _band_for(88)[0] == "Exceptional fit"
+    assert _band_for(87)[0] == "Strong fit"
     assert _band_for(75)[0] == "Strong fit"
-    assert _band_for(74)[0] == "Plausible fit"
-    assert _band_for(60)[0] == "Plausible fit"
-    assert _band_for(59)[0] == "Edge case"
-    assert _band_for(45)[0] == "Edge case"
-    assert _band_for(44)[0] == "Low fit"
+    assert _band_for(74)[0] == "Good fit"
+    assert _band_for(62)[0] == "Good fit"
+    assert _band_for(61)[0] == "Moderate fit"
+    assert _band_for(48)[0] == "Moderate fit"
+    assert _band_for(47)[0] == "Weak fit"
+    assert _band_for(35)[0] == "Weak fit"
+    assert _band_for(34)[0] == "Poor fit"

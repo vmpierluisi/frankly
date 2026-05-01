@@ -140,10 +140,10 @@ def _make_canned_teammate(n: int = 0) -> dict:
 def _make_synthesize_mock(centroid, n=5):
     call_index = 0
 
-    async def _fake(budget, system="", user="", schema=None, schema_name="",
-                    temperature=0.2, max_tokens=2000):
+    async def _fake(budget, **kwargs):
         nonlocal call_index
         call_index += 1
+        schema_name = kwargs.get("schema_name", "")
         if schema_name == "team_centroid":
             return centroid
         return _make_canned_teammate(call_index)

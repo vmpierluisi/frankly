@@ -17,13 +17,23 @@ from ...config import settings
 _MODEL_PRICES: dict[str, dict[str, float]] = {
     "anthropic/claude-sonnet-4.6":      {"in": 0.003,    "out": 0.015},
     "anthropic/claude-haiku-4.5":       {"in": 0.0008,   "out": 0.004},
-    "google/gemma-4-31b-it":            {"in": 0.00014,  "out": 0.0004},  # Venice provider
+    "google/gemma-4-31b-it":            {"in": 0.00014,  "out": 0.0004},  # Venice / DeepInfra
     "google/gemini-3-flash-preview":    {"in": 0.0,      "out": 0.0},    # preview — free tier
 }
-_DEFAULT_PRICES = _MODEL_PRICES.get(
-    settings.openrouter_model,
-    {"in": 0.001, "out": 0.005},
-)
+# Conservative fallback for unknown models — Sonnet pricing. We deliberately
+# do NOT key this off settings.openrouter_model: the configured model can be
+# a free-tier preview (zero cost), and inheriting that as the unknown-model
+# default would silently disable the cost ceiling for any typo'd model name.
+_DEFAULT_PRICES = _MODEL_PRICES["anthropic/claude-sonnet-4.6"]
+
+
+# Shared provider routing for persona / simulation-agent calls. Pinned to
+# Venice + DeepInfra (in priority order) so personas always run on the same
+# Gemma weights regardless of OpenRouter's auto-routing.
+PERSONA_PROVIDER: dict[str, Any] = {
+    "order": ["Venice", "DeepInfra"],
+    "allow_fallbacks": True,
+}
 
 
 @dataclass
