@@ -144,6 +144,9 @@ SEED_COMPANIES = [
         "name": "Meridian Capital Partners",
         "tagline": "Mid-market private credit. Amsterdam + NYC.",
         "role": "Financial Analyst — Credit Underwriting",
+        "role_family": "financial_analyst",
+        "target_seniority": "mid",
+        "is_open": True,
         "artifact_values": (
             "We write checks on companies our competitors don't understand. "
             "Our edge is patience and homework, not speed. Analysts are expected "
@@ -185,6 +188,9 @@ SEED_COMPANIES = [
         "name": "Kestrel Growth Partners",
         "tagline": "Late-stage growth equity. London + Singapore.",
         "role": "Financial Analyst — Growth Equity",
+        "role_family": "financial_analyst",
+        "target_seniority": "senior",
+        "is_open": True,
         "artifact_values": (
             "Conviction at speed. We back founders three weeks before our "
             "competitors notice the category. Our edge is pattern recognition "
@@ -240,6 +246,9 @@ def seed_companies(db: Session) -> None:
             name=spec["name"],
             tagline=spec.get("tagline"),
             role=spec["role"],
+            role_family=spec.get("role_family"),
+            target_seniority=spec.get("target_seniority"),
+            is_open=spec.get("is_open", True),
             artifact_values=spec.get("artifact_values", ""),
             artifact_role_spec=spec.get("artifact_role_spec", ""),
             artifact_team_structure=spec.get("artifact_team_structure", ""),
@@ -256,6 +265,23 @@ def seed_companies(db: Session) -> None:
                 )
             )
         db.add(company)
+    db.commit()
+
+
+def backfill_company_role_families(db: Session) -> None:
+    """Idempotent backfill: set role_family/target_seniority on existing seed companies."""
+    backfill = {
+        "meridian-capital": {"role_family": "financial_analyst", "target_seniority": "mid", "is_open": True},
+        "kestrel-growth":   {"role_family": "financial_analyst", "target_seniority": "senior", "is_open": True},
+    }
+    for company_id, fields in backfill.items():
+        company = db.get(models.Company, company_id)
+        if company is None:
+            continue
+        if company.role_family is None:
+            company.role_family = fields["role_family"]
+        if company.target_seniority is None:
+            company.target_seniority = fields["target_seniority"]
     db.commit()
 
 

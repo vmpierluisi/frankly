@@ -80,6 +80,14 @@ class Candidate(Base):
     )
     is_seed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Candidate-driven matching — declared job target set at intake completion.
+    target_role_family: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True, default=None
+    )
+    target_seniority: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True, default=None
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow
@@ -103,6 +111,15 @@ class Company(Base):
 
     # Simulation pipeline — extracted knowledge graph (Phase 2A+).
     knowledge_graph: Mapped[dict | None] = mapped_column(JSON, default=None)
+
+    # Candidate-driven matching — vacancy metadata.
+    role_family: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True, default=None
+    )
+    target_seniority: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True, default=None
+    )
+    is_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # Four sanctioned artifacts — text form, already parsed.
     artifact_values: Mapped[str] = mapped_column(Text, default="")
@@ -178,6 +195,15 @@ class Match(Base):
     # Full report JSON as returned by the matcher — criterionScores,
     # inconsistencyFlags, auditTrail, the whole envelope.
     report: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    # Candidate-driven matching — lifecycle tracking.
+    # Default 'succeeded' keeps backward-compat with rows created before this column.
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="succeeded", index=True
+    )
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
 
     # Mutual opt-in bookkeeping (stubs in v0).
     candidate_opt_in: Mapped[bool | None] = mapped_column(default=None)
@@ -325,3 +351,20 @@ def _block_rollout_log_update(mapper, connection, target):
 @event.listens_for(RolloutLog, "before_delete")
 def _block_rollout_log_delete(mapper, connection, target):
     raise RuntimeError("RolloutLog rows are append-only — deletes are not permitted.")
+
+
+# ----------------------------------------------------------------------------
+# Admin — validation runs
+# ----------------------------------------------------------------------------
+class ValidationRun(Base):
+    __tablename__ = "validation_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | running | done | failed
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    rows: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # uploaded CSV rows as list of dicts
+    results: Mapped[dict | None] = mapped_column(JSON, nullable=True) # correlation report
+    error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)

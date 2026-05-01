@@ -9,9 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import SessionLocal, init_db
-from .routes import candidates, companies, matches, scenarios, team, templates
+from .routes import admin, candidates, companies, matches, scenarios, team, templates
 from .schemas import HealthOut
-from .seed_data import seed_companies
+from .seed_data import seed_companies, backfill_company_role_families
+from .services.simulation import background_runner
 
 
 def _run_migrations() -> None:
@@ -35,7 +36,12 @@ async def lifespan(app: FastAPI):
 
     with SessionLocal() as db:
         seed_companies(db)
+        backfill_company_role_families(db)
+
+    await background_runner.sweep_pending()
     yield
+
+    await background_runner.shutdown()
 
 
 app = FastAPI(
@@ -63,6 +69,7 @@ def health() -> HealthOut:
     return HealthOut(ok=True)
 
 
+app.include_router(admin.router)
 app.include_router(candidates.router)
 app.include_router(companies.router)
 app.include_router(templates.router)

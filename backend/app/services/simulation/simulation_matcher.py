@@ -24,6 +24,7 @@ from typing import Any, TYPE_CHECKING
 from ..baseline_matcher import run_match as baseline_run_match
 from .aggregator import aggregate_fit_profile
 from .cost_tracker import CostBudget, CostCeilingExceeded
+from .proof_layer import get_proof_layer
 from .rollout import execute_rollout
 from .rollout_logger import log_event
 from ...config import settings
@@ -145,6 +146,16 @@ async def run_match(
 
     wall_start = datetime.now(timezone.utc)
 
+    await log_event(
+        match_id, None, "match_started",
+        {
+            "candidate_id": candidate.id,
+            "company_id": company.id,
+            "k_per_scenario": k_per_scenario,
+        },
+        db=db,
+    )
+
     # ---- Validate prerequisites -------------------------------------------
     teammates = _teammates_as_dicts(company)
     if not teammates:
@@ -160,6 +171,17 @@ async def run_match(
             detail="Company has no scenario library — draft scenarios first.",
         )
 
+    # Fast mode: cap scenarios + K for live demo speed (~30s/match).
+    if settings.sim_fast_mode:
+        scenarios = scenarios[:2]
+        k_per_scenario = 1
+
+    await log_event(
+        match_id, None, "team_loaded",
+        {"teammate_count": len(teammates), "scenario_count": len(scenarios)},
+        db=db,
+    )
+
     criteria = _criteria_as_dicts(company)
     company_dict = _company_as_dict(company)
 
@@ -169,6 +191,8 @@ async def run_match(
     except Exception as exc:  # noqa: BLE001
         await log_event(match_id, None, "persona_aggregation_failed", {"error": str(exc)}, db=db)
         raise HTTPException(status_code=502, detail=f"Persona resolution failed: {exc}") from exc
+
+    persona = await get_proof_layer().attest_persona(persona)
 
     await log_event(
         match_id, None, "persona_aggregated",
@@ -278,6 +302,11 @@ async def run_match(
             baseline_run_match(persona=legacy_persona, company=company_dict),
             timeout=60,
         )
+        await log_event(
+            match_id, None, "baseline_run",
+            {"overall_score": baseline_report.get("overallScore"), "band": baseline_report.get("band")},
+            db=db,
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Baseline matcher failed for match=%s: %s", match_id, exc)
         await log_event(match_id, None, "baseline_failed", {"error": str(exc)}, db=db)
@@ -321,6 +350,19 @@ async def run_match(
         audit_extra=audit_extra,
     )
 
+    # ---- ProofLayer — attest per-dimension scores then build proof chain ----
+    per_dim = fit_profile.get("dimensionScores") or fit_profile.get("criterionScores") or {}
+    attested_dims: dict[str, Any] = {}
+    for dim_key, dim_val in per_dim.items():
+        evidence = {"dimension": dim_key, "rollout_count": len(all_rollouts)}
+        attested = await get_proof_layer().attest_score(
+            {"key": dim_key, "value": dim_val}, evidence
+        )
+        attested_dims[dim_key] = attested.get("value", dim_val)
+
+    proof = await get_proof_layer().build_proof_chain(fit_profile, all_rollouts)
+    fit_profile["proofChain"] = proof
+
     # Patch baseline delta into the BaselineComparison row now that we have it
     if baseline_report and fit_profile.get("baselineComparison"):
         from ...models import BaselineComparison
@@ -336,6 +378,18 @@ async def run_match(
             "band": fit_profile["band"],
             "n_rollouts": len(all_rollouts),
             "budget_spent_usd": round(budget.spent_usd, 4),
+        },
+        db=db,
+    )
+
+    await log_event(
+        match_id, None, "match_finished",
+        {
+            "overall_score": fit_profile["overallScore"],
+            "band": fit_profile["band"],
+            "wall_ms": wall_ms,
+            "budget_spent_usd": round(budget.spent_usd, 4),
+            "n_rollouts": len(all_rollouts),
         },
         db=db,
     )

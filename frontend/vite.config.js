@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: parseInt(process.env.PORT || "5173", 10),
     watch: {
       // Docker bind mounts on macOS need polling for HMR to fire reliably.
       usePolling: true,

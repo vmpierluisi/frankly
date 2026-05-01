@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -22,10 +24,7 @@ router = APIRouter(
 @router.get("", response_model=list[schemas.CompanyListItem])
 def list_companies(db: Session = Depends(get_session)) -> list[schemas.CompanyListItem]:
     rows = db.query(models.Company).order_by(models.Company.name).all()
-    return [
-        schemas.CompanyListItem(id=c.id, name=c.name, role=c.role, tagline=c.tagline)
-        for c in rows
-    ]
+    return [schemas.CompanyListItem.model_validate(c) for c in rows]
 
 
 @router.post("", response_model=schemas.CompanyOut, status_code=status.HTTP_201_CREATED)
@@ -45,6 +44,9 @@ def create_company(
         name=payload.name,
         tagline=payload.tagline,
         role=payload.role,
+        role_family=payload.role_family,
+        target_seniority=payload.target_seniority,
+        is_open=payload.is_open,
         artifact_values=payload.artifact_values,
         artifact_role_spec=payload.artifact_role_spec,
         artifact_team_structure=payload.artifact_team_structure,
@@ -90,6 +92,9 @@ def update_company(
     company.name = payload.name
     company.tagline = payload.tagline
     company.role = payload.role
+    company.role_family = payload.role_family
+    company.target_seniority = payload.target_seniority
+    company.is_open = payload.is_open
     company.artifact_values = payload.artifact_values
     company.artifact_role_spec = payload.artifact_role_spec
     company.artifact_team_structure = payload.artifact_team_structure
@@ -123,6 +128,61 @@ def delete_company(
         raise HTTPException(status_code=404, detail="Company not found")
     db.delete(company)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# GET /companies/{company_id}/leaderboard
+# ---------------------------------------------------------------------------
+
+@router.get("/{company_id}/leaderboard", response_model=schemas.LeaderboardOut)
+def get_leaderboard(
+    company_id: str,
+    db: Session = Depends(get_session),
+) -> schemas.LeaderboardOut:
+    """Return all Match rows for a company ordered by status then overall_score."""
+    company = db.get(models.Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    matches = db.execute(
+        select(models.Match, models.Candidate)
+        .join(models.Candidate, models.Match.candidate_id == models.Candidate.id)
+        .where(models.Match.company_id == company_id)
+        .order_by(
+            # succeeded rows first, then by score descending, then by finish time
+            (models.Match.status != "succeeded").asc(),
+            models.Match.overall_score.desc(),
+            models.Match.finished_at.desc(),
+        )
+    ).all()
+
+    rows: list[schemas.LeaderboardRow] = []
+    for match, candidate in matches:
+        rows.append(
+            schemas.LeaderboardRow(
+                match_id=match.id,
+                candidate_id=candidate.id,
+                display_name=candidate.display_name,
+                candidate_seniority=candidate.target_seniority,
+                status=match.status,
+                overall_score=match.overall_score,
+                band=match.band,
+                report=match.report or {},
+                started_at=match.started_at,
+                finished_at=match.finished_at,
+                error_message=match.error_message,
+            )
+        )
+
+    return schemas.LeaderboardOut(
+        company_id=company.id,
+        company_name=company.name,
+        role=company.role,
+        role_family=company.role_family,
+        target_seniority=company.target_seniority,
+        is_open=company.is_open,
+        results=rows,
+    )
 
 
 # ---------------------------------------------------------------------------
