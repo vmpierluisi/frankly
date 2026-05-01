@@ -74,6 +74,7 @@ class Candidate(Base):
     cv_path: Mapped[str | None] = mapped_column(String(512), default=None)
     linkedin_url: Mapped[str | None] = mapped_column(String(500), default=None)
     github_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    portfolio_url: Mapped[str | None] = mapped_column(String(500), default=None)
     # "pending" until BFI+SJT submitted; seeded profiles start as "completed".
     assessment_status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False
@@ -95,6 +96,51 @@ class Candidate(Base):
 
     matches: Mapped[list["Match"]] = relationship(
         "Match", back_populates="candidate", cascade="all, delete-orphan"
+    )
+    verified_profile: Mapped["VerifiedProfile | None"] = relationship(
+        "VerifiedProfile",
+        back_populates="candidate",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+# ----------------------------------------------------------------------------
+# Verified profile — structured extraction from CV / Github / portfolio.
+# Public fields (experience, skills, education, github_repos) are exposed to
+# both candidate and recruiter. Internal fields (capability_ledger,
+# communication_ledger, voice_samples) are scaffolding for the agent prompt
+# and never returned to candidates or recruiters.
+# ----------------------------------------------------------------------------
+class VerifiedProfile(Base):
+    __tablename__ = "verified_profiles"
+
+    candidate_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("candidates.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    education: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    experience: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    skills: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    github_repos: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Internal scaffolding for the simulation agent. NEVER returned via public API.
+    capability_ledger: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    communication_ledger: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    voice_samples: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Audit / provenance.
+    edited_fields: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    source_versions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    extracted_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow
+    )
+
+    candidate: Mapped[Candidate] = relationship(
+        "Candidate", back_populates="verified_profile"
     )
 
 
