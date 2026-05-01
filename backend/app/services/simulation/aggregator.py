@@ -20,13 +20,17 @@ if TYPE_CHECKING:
 
 # Band thresholds — shared with baseline_matcher for consistency.
 def _band_for(score: float) -> tuple[str, str]:
+    if score >= 88:
+        return "Exceptional fit", "Strong recommendation to surface to hiring manager for mutual opt-in."
     if score >= 75:
         return "Strong fit", "Recommend surfacing to hiring manager for mutual opt-in."
-    if score >= 60:
-        return "Plausible fit", "Worth a conversation; specific tensions worth probing in interview."
-    if score >= 45:
-        return "Edge case", "Environmental fit is uncertain. Not recommended without additional signal."
-    return "Low fit", "Candidate strengths likely lie in structurally different environments."
+    if score >= 62:
+        return "Good fit", "Worth a conversation; specific tensions worth probing in interview."
+    if score >= 48:
+        return "Moderate fit", "Environmental fit is uncertain. Not recommended without additional signal."
+    if score >= 35:
+        return "Weak fit", "Candidate strengths likely lie in structurally different environments."
+    return "Poor fit", "Significant environmental mismatch. Not recommended."
 
 
 def aggregate_fit_profile(

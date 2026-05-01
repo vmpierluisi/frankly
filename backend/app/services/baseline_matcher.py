@@ -171,24 +171,34 @@ def _schema_for_criteria(criterion_keys: list[str]) -> dict[str, Any]:
 # Band derivation — same thresholds as the JSX reference.
 # ---------------------------------------------------------------------------
 def _band_for(score: float, company_name: str) -> tuple[str, str]:
+    if score >= 88:
+        return (
+            "Exceptional fit",
+            "Strong recommendation to surface to hiring manager for mutual opt-in.",
+        )
     if score >= 75:
         return (
             "Strong fit",
             "Recommend surfacing to hiring manager for mutual opt-in.",
         )
-    if score >= 60:
+    if score >= 62:
         return (
-            "Plausible fit",
+            "Good fit",
             "Worth a conversation; specific tensions worth probing in interview.",
         )
-    if score >= 45:
+    if score >= 48:
         return (
-            "Edge case",
+            "Moderate fit",
             "Environmental fit is uncertain. Not recommended for surfacing without additional signal.",
         )
+    if score >= 35:
+        return (
+            "Weak fit",
+            f"Candidate strengths likely lie in environments structurally different from {company_name}'s.",
+        )
     return (
-        "Low fit",
-        f"Candidate strengths likely lie in environments structurally different from {company_name}'s.",
+        "Poor fit",
+        f"Significant environmental mismatch with {company_name}. Not recommended.",
     )
 
 

@@ -29,6 +29,9 @@ export default function TemplateSetup() {
     name: "",
     tagline: "",
     role: "",
+    role_family: "",
+    target_seniority: "",
+    is_open: true,
     artifact_values: "",
     artifact_role_spec: "",
     artifact_team_structure: "",
@@ -52,6 +55,9 @@ export default function TemplateSetup() {
           name: c.name,
           tagline: c.tagline || "",
           role: c.role,
+          role_family: c.role_family || "",
+          target_seniority: c.target_seniority || "",
+          is_open: c.is_open !== false,
           artifact_values: c.artifact_values || "",
           artifact_role_spec: c.artifact_role_spec || "",
           artifact_team_structure: c.artifact_team_structure || "",
@@ -139,6 +145,8 @@ export default function TemplateSetup() {
     const payload = {
       ...form,
       id: form.id || undefined,
+      role_family: form.role_family || null,
+      target_seniority: form.target_seniority || null,
       criteria: criteria.map(({ id, ordering, ...c }) => ({
         ...c,
         weight: Number(c.weight) || 0,
@@ -209,7 +217,7 @@ export default function TemplateSetup() {
           />
         </div>
       </div>
-      <div style={{ marginBottom: 32 }}>
+      <div style={{ marginBottom: 16 }}>
         <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Tagline (optional)</label>
         <input
           className="ed"
@@ -220,6 +228,62 @@ export default function TemplateSetup() {
           data-form-type="other"
           data-lpignore="true"
         />
+      </div>
+
+      {/* Vacancy metadata */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 32 }}>
+        <div>
+          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Role family</label>
+          <select
+            className="ed"
+            value={form.role_family}
+            onChange={(e) => update("role_family", e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="">— select —</option>
+            {[
+              ["financial_analyst", "Financial Analyst"],
+              ["software_engineer", "Software Engineer"],
+              ["product_manager", "Product Manager"],
+              ["data_scientist", "Data Scientist"],
+              ["operations_manager", "Operations Manager"],
+              ["marketing_manager", "Marketing Manager"],
+              ["sales_executive", "Sales Executive"],
+              ["hr_business_partner", "HR Business Partner"],
+              ["legal_counsel", "Legal Counsel"],
+              ["strategy_consultant", "Strategy Consultant"],
+            ].map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Seniority target</label>
+          <select
+            className="ed"
+            value={form.target_seniority}
+            onChange={(e) => update("target_seniority", e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="">— select —</option>
+            <option value="junior">Junior</option>
+            <option value="mid">Mid-level</option>
+            <option value="senior">Senior</option>
+            <option value="lead">Lead / Principal</option>
+          </select>
+        </div>
+        <div>
+          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Vacancy status</label>
+          <select
+            className="ed"
+            value={form.is_open ? "open" : "closed"}
+            onChange={(e) => update("is_open", e.target.value === "open")}
+            style={{ width: "100%" }}
+          >
+            <option value="open">Open — accepting candidates</option>
+            <option value="closed">Closed — position filled</option>
+          </select>
+        </div>
       </div>
 
       {/* Artifacts */}

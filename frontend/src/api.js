@@ -85,6 +85,7 @@ export const companies = {
     request(`/companies/${id}`, { method: "PUT", body: payload, auth: true }),
   remove: (id) =>
     request(`/companies/${id}`, { method: "DELETE", auth: true, raw: true }),
+  leaderboard: (id) => request(`/companies/${id}/leaderboard`, { auth: true }),
 };
 
 // ---------- Templates (artifact parse + criteria extract) ----------
@@ -111,12 +112,6 @@ export const matches = {
     request("/matches/trigger", {
       method: "POST",
       body: { candidate_id, company_id },
-      auth: true,
-    }),
-  search: (company_id, { refresh = false } = {}) =>
-    request("/matches/search", {
-      method: "POST",
-      body: { company_id, refresh },
       auth: true,
     }),
   list: (params = {}) => {

@@ -112,6 +112,11 @@ def submit_assessment(
     candidate.sjt_responses = payload.sjt_responses
     candidate.assessment_status = "completed"
 
+    if payload.target_role_family is not None:
+        candidate.target_role_family = payload.target_role_family
+    if payload.target_seniority is not None:
+        candidate.target_seniority = payload.target_seniority
+
     persona = synthesize_persona(payload.bfi_responses, payload.sjt_responses)
     candidate.cached_big_five = persona["bigFive"]
     candidate.cached_sjt_signals = persona["sjtSignals"]
@@ -119,6 +124,14 @@ def submit_assessment(
     candidate.cached_narrative = persona["narrative"]
 
     db.commit()
+
+    from ..services import matching_engine
+    from ..services.simulation import background_runner
+    new_matches = matching_engine.enqueue_matches_for_candidate(db, candidate)
+    db.commit()
+    for m in new_matches:
+        background_runner.schedule(m.id)
+
     db.refresh(candidate)
     return _to_me_out(candidate)
 

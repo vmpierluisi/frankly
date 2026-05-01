@@ -99,6 +99,8 @@ class CandidateMePatchIn(BaseModel):
 class AssessmentSubmitIn(BaseModel):
     bfi_responses: dict[str, int] = Field(default_factory=dict)
     sjt_responses: dict[str, str] = Field(default_factory=dict)
+    target_role_family: str | None = None
+    target_seniority: str | None = None
 
 
 class AggregatedPersonaOut(BaseModel):
@@ -141,6 +143,9 @@ class CompanyIn(BaseModel):
     name: str
     tagline: str | None = None
     role: str
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool = True
     artifact_values: str = ""
     artifact_role_spec: str = ""
     artifact_team_structure: str = ""
@@ -155,6 +160,9 @@ class CompanyOut(BaseModel):
     name: str
     tagline: str | None = None
     role: str
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool = True
     artifact_values: str
     artifact_role_spec: str
     artifact_team_structure: str
@@ -171,6 +179,9 @@ class CompanyListItem(BaseModel):
     name: str
     role: str
     tagline: str | None = None
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool = True
 
 
 # ----------------------------------------------------------------------------
@@ -242,6 +253,7 @@ class SearchMatchResultItem(BaseModel):
     report: dict[str, Any]
     fit_axes: FitAxes
     cached: bool
+    match_id: str | None = None
     is_seed: bool = False
 
 
@@ -263,9 +275,37 @@ class MatchOut(BaseModel):
     band: str
     band_note: str
     report: dict[str, Any]
+    status: str = "succeeded"
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     candidate_opt_in: bool | None = None
     manager_opt_in: bool | None = None
     created_at: datetime
+
+
+class LeaderboardRow(BaseModel):
+    match_id: str
+    candidate_id: str
+    display_name: str | None = None
+    candidate_seniority: str | None = None
+    status: str
+    overall_score: int
+    band: str
+    report: dict[str, Any]
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error_message: str | None = None
+
+
+class LeaderboardOut(BaseModel):
+    company_id: str
+    company_name: str
+    role: str
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool
+    results: list[LeaderboardRow]
 
 
 # ----------------------------------------------------------------------------

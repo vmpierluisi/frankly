@@ -17,6 +17,7 @@ from typing import NamedTuple, TYPE_CHECKING, Any
 
 from .cost_tracker import CostBudget, tracked_chat_json
 from .rollout_logger import log_event
+from ...config import settings
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -304,20 +305,21 @@ async def score_rollout(
     except Exception as exc:  # noqa: BLE001
         logger.warning("judge call A failed for rollout %s: %s", rollout.id, exc)
 
-    # --- Judge call B (seed index 1) ----------------------------------------
+    # --- Judge call B (seed index 1) — skipped in fast mode -----------------
     raw_b: dict | None = None
-    try:
-        raw_b = await tracked_chat_json(
-            budget,
-            system=JUDGE_SYSTEM,
-            user=user_prompt,
-            schema=schema,
-            schema_name="judge_output",
-            temperature=_JUDGE_TEMPERATURES[1],
-            max_tokens=2500,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("judge call B failed for rollout %s: %s", rollout.id, exc)
+    if not settings.sim_fast_mode:
+        try:
+            raw_b = await tracked_chat_json(
+                budget,
+                system=JUDGE_SYSTEM,
+                user=user_prompt,
+                schema=schema,
+                schema_name="judge_output",
+                temperature=_JUDGE_TEMPERATURES[1],
+                max_tokens=2500,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("judge call B failed for rollout %s: %s", rollout.id, exc)
 
     # --- Determine fallback mode --------------------------------------------
     if raw_a is None and raw_b is None:

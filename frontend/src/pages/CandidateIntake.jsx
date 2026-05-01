@@ -4,10 +4,34 @@ import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { candidates } from "../api.js";
 import { GeneratingScreen, Pillar } from "../components/Widgets.jsx";
 
+// Role families and seniority levels must match backend lib/role_families.py
+const ROLE_FAMILIES = [
+  { value: "financial_analyst",  label: "Financial Analyst" },
+  { value: "software_engineer",  label: "Software Engineer" },
+  { value: "product_manager",    label: "Product Manager" },
+  { value: "data_scientist",     label: "Data Scientist" },
+  { value: "operations_manager", label: "Operations Manager" },
+  { value: "marketing_manager",  label: "Marketing Manager" },
+  { value: "sales_executive",    label: "Sales Executive" },
+  { value: "hr_business_partner", label: "HR Business Partner" },
+  { value: "legal_counsel",      label: "Legal Counsel" },
+  { value: "strategy_consultant", label: "Strategy Consultant" },
+];
+
+const SENIORITY_LEVELS = [
+  { value: "junior", label: "Junior (0–2 yrs)" },
+  { value: "mid",    label: "Mid-level (2–5 yrs)" },
+  { value: "senior", label: "Senior (5–9 yrs)" },
+  { value: "lead",   label: "Lead / Principal (9+ yrs)" },
+];
+
 export default function CandidateIntake() {
   const nav = useNavigate();
-  const [step, setStep] = useState("intro"); // intro | bfi | sjt | submitting | submitted
+  // steps: intro → target → bfi → sjt → submitting → submitted
+  const [step, setStep] = useState("intro");
   const [instruments, setInstruments] = useState(null);
+  const [targetRoleFamily, setTargetRoleFamily] = useState("");
+  const [targetSeniority, setTargetSeniority] = useState("");
   const [bfiResponses, setBfiResponses] = useState({});
   const [sjtResponses, setSjtResponses] = useState({});
   const [error, setError] = useState("");
@@ -23,6 +47,8 @@ export default function CandidateIntake() {
       await candidates.submitAssessment({
         bfi_responses: bfiResponses,
         sjt_responses: sjtResponses,
+        target_role_family: targetRoleFamily || null,
+        target_seniority: targetSeniority || null,
       });
       setStep("submitted");
     } catch (e) {
@@ -46,7 +72,16 @@ export default function CandidateIntake() {
 
   return (
     <main className="container" style={{ maxWidth: 860 }}>
-      {step === "intro" && <IntroScreen onStart={() => setStep("bfi")} />}
+      {step === "intro" && <IntroScreen onStart={() => setStep("target")} />}
+      {step === "target" && (
+        <TargetScreen
+          roleFamily={targetRoleFamily}
+          seniority={targetSeniority}
+          setRoleFamily={setTargetRoleFamily}
+          setSeniority={setTargetSeniority}
+          onSubmit={() => setStep("bfi")}
+        />
+      )}
       {step === "bfi" && (
         <BfiScreen
           items={instruments.bfi}
@@ -114,12 +149,77 @@ function IntroScreen({ onStart }) {
 }
 
 // ----------------------------------------------------------------------------
+function TargetScreen({ roleFamily, seniority, setRoleFamily, setSeniority, onSubmit }) {
+  const canContinue = roleFamily && seniority;
+  return (
+    <div>
+      <div className="label-mono" style={{ marginBottom: 12 }}>Step 1 of 3 · Target role</div>
+      <h2
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 34,
+          fontWeight: 500,
+          letterSpacing: "-0.01em",
+          margin: "0 0 12px",
+        }}
+      >
+        What kind of role are you looking for?
+      </h2>
+      <p style={{ color: COLORS.muted, marginBottom: 40, fontSize: 16 }}>
+        We use this to find open positions that match your target. You will not be told
+        which companies are considering you — that information stays blind until both sides opt in.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
+        <div>
+          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+            Role family
+          </label>
+          <select
+            className="ed"
+            value={roleFamily}
+            onChange={(e) => setRoleFamily(e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="">— select —</option>
+            {ROLE_FAMILIES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label-mono" style={{ display: "block", marginBottom: 8 }}>
+            Seniority level
+          </label>
+          <select
+            className="ed"
+            value={seniority}
+            onChange={(e) => setSeniority(e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="">— select —</option>
+            {SENIORITY_LEVELS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <button className="primary" disabled={!canContinue} onClick={onSubmit}>
+        Continue to assessment →
+      </button>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
 function BfiScreen({ items, responses, setResponses, onSubmit }) {
   const complete = Object.keys(responses).length;
   return (
     <div>
       <div className="label-mono" style={{ marginBottom: 12 }}>
-        Section I of II · Big Five Inventory (BFI-10)
+        Step 2 of 3 · Big Five Inventory (BFI-10)
       </div>
       <h2
         style={{
@@ -173,7 +273,7 @@ function SjtScreen({ sjts, responses, setResponses, onSubmit, error }) {
   const complete = Object.keys(responses).length;
   return (
     <div>
-      <div className="label-mono" style={{ marginBottom: 12 }}>Section II of II · Situational Judgment</div>
+      <div className="label-mono" style={{ marginBottom: 12 }}>Step 3 of 3 · Situational Judgment</div>
       <h2
         style={{
           fontFamily: FONT_DISPLAY,
@@ -255,10 +355,10 @@ function SubmittedScreen({ onContinue }) {
         Your responses are in.
       </h2>
       <p className="drop-cap" style={{ fontSize: 18, lineHeight: 1.65, marginBottom: 16 }}>
-        We'll run your persona against the company environments in our template library.
-        If there's a match, the hiring manager will be notified — and you'll see an invitation
-        on your profile page to opt in or decline. Until then, neither of you knows which
-        company is on the other side.
+        Your evaluation is running against any open positions that match your target role
+        and seniority. You will not be told which companies are involved. If there's a
+        mutual interest, you'll see an invitation on your profile to opt in or decline —
+        and neither side knows who's on the other until both agree.
       </p>
       <button className="primary" onClick={onContinue}>Go to my dashboard →</button>
     </div>

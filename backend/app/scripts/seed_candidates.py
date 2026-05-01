@@ -38,6 +38,21 @@ from app import models
 from app.services.persona import synthesize_persona
 from app.services.persona_generator import ARCHETYPES, generate_synthetic_responses
 
+# Seniority distribution for 100 candidates: junior=30, mid=35, senior=25, lead=10.
+# Deterministic by index — stable across re-seeds.
+_SENIORITY_BUCKETS = (
+    [("junior", 30), ("mid", 35), ("senior", 25), ("lead", 10)]
+)
+
+def _seniority_for_index(idx: int) -> str:
+    """Return a seniority level for a 0-based candidate index (deterministic)."""
+    thresholds = [0, 30, 65, 90, 100]
+    pos = idx % 100
+    for i, (level, _) in enumerate(_SENIORITY_BUCKETS):
+        if pos < thresholds[i + 1]:
+            return level
+    return "mid"
+
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
@@ -47,6 +62,7 @@ async def _generate_one(
     sem: asyncio.Semaphore,
     archetype: str,
     idx: int,
+    seniority: str = "mid",
 ) -> models.Candidate:
     async with sem:
         print(f"  [{idx:>3}] generating — {archetype[:50]}…")
@@ -78,6 +94,8 @@ async def _generate_one(
         cached_narrative=persona["narrative"],
         assessment_status="completed",
         is_seed=True,
+        target_role_family="financial_analyst",
+        target_seniority=seniority,
         linkedin_url=f"https://linkedin.com/in/{slug}",
         github_url=f"https://github.com/{slug}",
     )
@@ -101,7 +119,7 @@ async def seed(count: int, force: bool) -> None:
 
     sem = asyncio.Semaphore(8)
     archetypes = [ARCHETYPES[i % len(ARCHETYPES)] for i in range(count)]
-    tasks = [_generate_one(sem, arch, i + 1) for i, arch in enumerate(archetypes)]
+    tasks = [_generate_one(sem, arch, i + 1, _seniority_for_index(i)) for i, arch in enumerate(archetypes)]
     candidates = await asyncio.gather(*tasks)
 
     print("Inserting into database…")

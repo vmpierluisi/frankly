@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     openrouter_api_key: str = ""
-    openrouter_model: str = "anthropic/claude-sonnet-4.6"
+    openrouter_model: str = "google/gemini-3-flash-preview"
     openrouter_http_referer: str = "http://localhost:5173"
     openrouter_x_title: str = "hiring-sim-v0"
 
@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # and Supabase is configured).
     manager_username: str = "manager"
     manager_password: str = "changeme"
+    # Admin API token — checked against Authorization: Bearer <token> on /admin/* routes.
+    admin_password: str = "changeme-admin"
     # Skip JWT verification in local dev (never set true in compose/prod).
     dev_mode: bool = False
 
@@ -41,6 +43,9 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Simulation pipeline ---
+    # Fast mode: K=1, 2 scenarios, 1 judge — ~30s/match for live demos.
+    sim_fast_mode: bool = False
+
     sim_rollouts_concurrency: int = 5
     sim_judges_per_rollout: int = 2
     sim_max_turns_dyad: int = 6

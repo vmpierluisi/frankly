@@ -71,6 +71,7 @@ async def chat_json(
     schema: dict[str, Any],
     schema_name: str,
     model: str | None = None,
+    provider: dict[str, Any] | None = None,
     temperature: float = 0.2,
     max_tokens: int = 2000,
 ) -> dict[str, Any]:
@@ -87,6 +88,10 @@ async def chat_json(
         Short identifier sent to OpenRouter as the response_format name.
     model : str, optional
         Override the default (settings.openrouter_model).
+    provider : dict, optional
+        OpenRouter provider routing, e.g.
+        ``{"order": ["Google AI Studio"], "allow_fallbacks": False}``.
+        When set, pins the call to the specified provider(s).
 
     Notes
     -----
@@ -121,6 +126,8 @@ async def chat_json(
         # don't blow up on the occasional off-schema emission.
         "plugins": [{"id": "response-healing"}],
     }
+    if provider:
+        payload["provider"] = provider
 
     headers = {
         "Authorization": f"Bearer {settings.openrouter_api_key}",

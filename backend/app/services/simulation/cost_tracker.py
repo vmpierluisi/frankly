@@ -15,11 +15,15 @@ from ...config import settings
 
 # Per-model price table (USD per 1K tokens). Update when model pricing changes.
 _MODEL_PRICES: dict[str, dict[str, float]] = {
-    "anthropic/claude-sonnet-4.6": {"in": 0.003,   "out": 0.015},
-    "anthropic/claude-haiku-4.5":  {"in": 0.0008,  "out": 0.004},
-    "google/gemma-4-31b-it":       {"in": 0.00014, "out": 0.0004},
+    "anthropic/claude-sonnet-4.6":      {"in": 0.003,    "out": 0.015},
+    "anthropic/claude-haiku-4.5":       {"in": 0.0008,   "out": 0.004},
+    "google/gemma-4-31b-it":            {"in": 0.00014,  "out": 0.0004},  # Venice provider
+    "google/gemini-3-flash-preview":    {"in": 0.0,      "out": 0.0},    # preview — free tier
 }
-_DEFAULT_PRICES = _MODEL_PRICES["anthropic/claude-sonnet-4.6"]
+_DEFAULT_PRICES = _MODEL_PRICES.get(
+    settings.openrouter_model,
+    {"in": 0.001, "out": 0.005},
+)
 
 
 @dataclass

@@ -6,7 +6,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "/Users/victormp/Desktop/frankly/frontend",
-      "port": 5173
+      "autoPort": true
     }
   ]
 }
