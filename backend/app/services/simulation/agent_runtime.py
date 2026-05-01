@@ -10,7 +10,8 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .cost_tracker import CostBudget, tracked_chat_json
+from ...config import settings
+from .cost_tracker import CostBudget, PERSONA_PROVIDER, tracked_chat_json
 from .scenario_engine import AgentState, WorldState
 
 if TYPE_CHECKING:
@@ -18,8 +19,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_AGENT_MODEL = "google/gemma-4-31b-it"
-_AGENT_PROVIDER = {"order": ["Venice"], "allow_fallbacks": False}
+_AGENT_MODEL = settings.openrouter_persona_model
+_AGENT_PROVIDER = PERSONA_PROVIDER
 
 # ---------------------------------------------------------------------------
 # Prompt templates (verbatim from brief Appendix A.6)

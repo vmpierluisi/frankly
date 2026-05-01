@@ -13,7 +13,13 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     openrouter_api_key: str = ""
+    # Default / judge model — fast and cheap. Used for the judge and any call
+    # that doesn't explicitly pin a model.
     openrouter_model: str = "google/gemini-3-flash-preview"
+    # Persona / simulation-agent model. Used by the agent runtime, persona
+    # aggregator, and team synthesizer to give each candidate a distinct,
+    # less-polished voice than the judge model produces.
+    openrouter_persona_model: str = "google/gemma-4-31b-it"
     openrouter_http_referer: str = "http://localhost:5173"
     openrouter_x_title: str = "hiring-sim-v0"
 

@@ -11,7 +11,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
-from .cost_tracker import CostBudget, tracked_chat_json
+from ...config import settings
+from .cost_tracker import CostBudget, PERSONA_PROVIDER, tracked_chat_json
 from .knowledge_graph import summarize_for_prompt
 
 if TYPE_CHECKING:
@@ -214,6 +215,8 @@ async def extract_centroid(company: "Company", *, budget: CostBudget) -> dict[st
     user_prompt = _render_centroid_user_prompt(company)
     result = await tracked_chat_json(
         budget,
+        model=settings.openrouter_persona_model,
+        provider=PERSONA_PROVIDER,
         system=TEAM_CENTROID_SYSTEM,
         user=user_prompt,
         schema=TEAM_CENTROID_SCHEMA,
@@ -414,6 +417,8 @@ async def _generate_one_teammate(
     )
     return await tracked_chat_json(
         budget,
+        model=settings.openrouter_persona_model,
+        provider=PERSONA_PROVIDER,
         system=TEAMMATE_GENERATOR_SYSTEM,
         user=user_prompt,
         schema=SYNTHETIC_TEAMMATE_SCHEMA,

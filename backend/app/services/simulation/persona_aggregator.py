@@ -17,9 +17,10 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ...config import settings
 from ...seed_data import BFI10, SJTS
 from ..artifact_parser import parse_upload
-from .cost_tracker import CostBudget, tracked_chat_json
+from .cost_tracker import CostBudget, PERSONA_PROVIDER, tracked_chat_json
 from .types import AggregatedPersona
 
 if TYPE_CHECKING:
@@ -408,6 +409,8 @@ async def aggregate(candidate: "Candidate", *, budget: CostBudget) -> Aggregated
     user_prompt = _render_user_prompt(candidate)
     result = await tracked_chat_json(
         budget,
+        model=settings.openrouter_persona_model,
+        provider=PERSONA_PROVIDER,
         system=PERSONA_AGGREGATOR_SYSTEM,
         user=user_prompt,
         schema=AGGREGATED_PERSONA_SCHEMA,
