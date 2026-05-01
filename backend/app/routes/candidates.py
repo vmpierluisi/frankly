@@ -11,6 +11,7 @@ from ..auth import CurrentUser, require_candidate, require_manager
 from ..config import settings
 from ..db import get_session
 from ..services.persona import synthesize_persona
+from ..services.profile_extraction import extract_profile
 from ..services.simulation.cost_tracker import CostBudget
 from ..services.simulation.persona_aggregator import aggregate
 from ..seed_data import BFI10, SJTS
@@ -79,7 +80,7 @@ def update_me(
     if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found — call GET /me first.")
 
-    for field in ("display_name", "linkedin_url", "github_url", "cv_path"):
+    for field in ("display_name", "linkedin_url", "github_url", "portfolio_url", "cv_path"):
         val = getattr(payload, field)
         if val is not None:
             setattr(candidate, field, val)
@@ -87,6 +88,70 @@ def update_me(
     db.commit()
     db.refresh(candidate)
     return _to_me_out(candidate)
+
+
+# ---------------------------------------------------------------------------
+# Candidate self-service — verified profile extraction
+# ---------------------------------------------------------------------------
+@router.post(
+    "/me/profile/extract",
+    response_model=schemas.VerifiedProfileOut,
+    summary="Run structured profile extraction (CV + Github + portfolio).",
+)
+async def extract_my_profile(
+    user: CurrentUser = Depends(require_candidate),
+    db: Session = Depends(get_session),
+) -> schemas.VerifiedProfileOut:
+    """Extract structured profile data from CV + Github + portfolio.
+
+    Idempotent: re-running overwrites the previous row but preserves
+    edited_fields so candidate corrections don't get clobbered. Returns the
+    public-facing portion only — capability/communication ledgers and voice
+    samples remain server-side scaffolding.
+    """
+    candidate = (
+        db.query(models.Candidate)
+        .filter(models.Candidate.auth_user_id == user.auth_user_id)
+        .first()
+    )
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found — call GET /me first.")
+
+    budget = CostBudget(ceiling_usd=settings.match_cost_ceiling_usd)
+    try:
+        merged = await extract_profile(candidate, budget=budget)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Profile extraction failed: {exc}",
+        ) from exc
+
+    profile = (
+        db.query(models.VerifiedProfile)
+        .filter(models.VerifiedProfile.candidate_id == candidate.id)
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    if profile is None:
+        profile = models.VerifiedProfile(
+            candidate_id=candidate.id,
+            extracted_at=now,
+        )
+        db.add(profile)
+
+    profile.experience = merged["experience"]
+    profile.education = merged["education"]
+    profile.skills = merged["skills"]
+    profile.github_repos = merged["github_repos"]
+    profile.capability_ledger = merged["capability_ledger"]
+    profile.communication_ledger = merged["communication_ledger"]
+    profile.voice_samples = merged["voice_samples"]
+    profile.source_versions = merged["source_versions"]
+    profile.extracted_at = now
+
+    db.commit()
+    db.refresh(profile)
+    return _to_verified_out(profile)
 
 
 @router.post("/me/assessment", response_model=schemas.CandidateMeOut)
@@ -373,9 +438,23 @@ def _to_me_out(candidate: models.Candidate) -> schemas.CandidateMeOut:
         cv_path=candidate.cv_path,
         linkedin_url=candidate.linkedin_url,
         github_url=candidate.github_url,
+        portfolio_url=candidate.portfolio_url,
         assessment_status=candidate.assessment_status,
         is_seed=candidate.is_seed,
         created_at=candidate.created_at,
         updated_at=candidate.updated_at,
         persona=_persona(candidate),
+    )
+
+
+def _to_verified_out(profile: models.VerifiedProfile) -> schemas.VerifiedProfileOut:
+    return schemas.VerifiedProfileOut(
+        candidate_id=profile.candidate_id,
+        experience=profile.experience or [],
+        education=profile.education or [],
+        skills=profile.skills or [],
+        github_repos=profile.github_repos or [],
+        edited_fields=profile.edited_fields or [],
+        extracted_at=profile.extracted_at,
+        updated_at=profile.updated_at,
     )

@@ -82,6 +82,7 @@ class CandidateMeOut(BaseModel):
     cv_path: str | None = None
     linkedin_url: str | None = None
     github_url: str | None = None
+    portfolio_url: str | None = None
     assessment_status: str = "pending"
     is_seed: bool = False
     created_at: datetime
@@ -93,7 +94,25 @@ class CandidateMePatchIn(BaseModel):
     display_name: str | None = None
     linkedin_url: str | None = None
     github_url: str | None = None
+    portfolio_url: str | None = None
     cv_path: str | None = None
+
+
+class VerifiedProfileOut(BaseModel):
+    """Public fields of a verified profile.
+
+    Internal scaffolding (capability_ledger, communication_ledger,
+    voice_samples) is intentionally excluded — those drive the simulation
+    agent prompt and are never returned to candidates or recruiters.
+    """
+    candidate_id: str
+    experience: list[dict[str, Any]] = Field(default_factory=list)
+    education: list[dict[str, Any]] = Field(default_factory=list)
+    skills: list[dict[str, Any]] = Field(default_factory=list)
+    github_repos: list[dict[str, Any]] = Field(default_factory=list)
+    edited_fields: list[str] = Field(default_factory=list)
+    extracted_at: datetime
+    updated_at: datetime
 
 
 class AssessmentSubmitIn(BaseModel):
