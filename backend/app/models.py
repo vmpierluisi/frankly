@@ -333,6 +333,11 @@ class Rollout(Base):
     seed: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed")
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    # Tagged from simulation.PROMPT_VERSION at write time so analytics can
+    # group rollouts by the prompt scaffolding that produced them.
+    prompt_version: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="legacy", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -350,7 +355,50 @@ class RolloutScore(Base):
     judge_model: Mapped[str] = mapped_column(String(120), nullable=False)
     judge_seed_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    prompt_version: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="legacy", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+# ----------------------------------------------------------------------------
+# Calibration responses — schema-only scaffold. Behavior (sampling, MCQ
+# generation, candidate UX) lands in PR #5. Adding the table now means
+# historical rollouts (tagged with prompt_version) can be paired against
+# future calibration data without a migration.
+# ----------------------------------------------------------------------------
+class CalibrationResponse(Base):
+    __tablename__ = "calibration_responses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    candidate_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="CASCADE"),
+        index=True, nullable=False,
+    )
+    rollout_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("rollouts.id", ondelete="SET NULL"),
+        nullable=True, index=True, default=None,
+    )
+    scenario_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("moments_of_truth.id", ondelete="SET NULL"),
+        nullable=True, index=True, default=None,
+    )
+    agent_response_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Each item: {"text": str, "is_agent_answer": bool, "skill_level": str}.
+    mcq_options: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    candidate_selection_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    candidate_free_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 0.0 = matched agent; 1.0 = total mismatch. Computed on submission.
+    divergence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # "mcq_plus_text" (default) or "free_text_only" when the rollout had low
+    # judge confidence and we chose not to bias the candidate with options.
+    mode: Mapped[str] = mapped_column(String(40), nullable=False, default="mcq_plus_text")
+    prompt_version: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="legacy"
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
 
 
 # ----------------------------------------------------------------------------
