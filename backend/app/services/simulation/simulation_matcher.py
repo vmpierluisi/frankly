@@ -43,14 +43,45 @@ _DEFAULT_K = 1  # keep cheap in v0; raise via config when ready
 # Persona resolution
 # ---------------------------------------------------------------------------
 
+def _verified_profile_payload(candidate: "Candidate") -> dict[str, Any] | None:
+    """Extract VerifiedProfile fields used by the agent prompt and pre-flight.
+
+    Returns None when the candidate has no VerifiedProfile row. The payload
+    contains everything the simulation pipeline needs to enforce skill /
+    communication faithfulness — the public-facing profile fields plus the
+    internal capability_ledger, communication_ledger, and voice_samples.
+    """
+    vp = getattr(candidate, "verified_profile", None)
+    if vp is None:
+        return None
+    return {
+        "education": list(vp.education or []),
+        "experience": list(vp.experience or []),
+        "skills": list(vp.skills or []),
+        "github_repos": list(vp.github_repos or []),
+        "capability_ledger": dict(vp.capability_ledger or {}),
+        "communication_ledger": dict(vp.communication_ledger or {}),
+        "voice_samples": list(vp.voice_samples or []),
+    }
+
+
 def _resolve_persona(candidate: "Candidate") -> dict[str, Any]:
     """Return the best available persona dict for this candidate.
 
     Prefers aggregated_persona (Phase 1B). Falls back to synthesizing from
     BFI/SJT responses via the legacy persona module.
+
+    The VerifiedProfile (if present) is stitched in under
+    ``verified_profile`` so downstream rollout / agent prompt code can render
+    the capability ledger, communication style, and voice samples.
     """
+    verified_payload = _verified_profile_payload(candidate)
+
     if candidate.aggregated_persona:
-        return candidate.aggregated_persona
+        persona = dict(candidate.aggregated_persona)
+        if verified_payload is not None:
+            persona["verified_profile"] = verified_payload
+        return persona
 
     from ...services.persona import synthesize_persona  # deferred
     legacy = synthesize_persona(
@@ -58,7 +89,7 @@ def _resolve_persona(candidate: "Candidate") -> dict[str, Any]:
         candidate.sjt_responses or {},
     )
     # Wrap legacy shape so it's compatible with simulation pipeline fields.
-    return {
+    persona = {
         "narrative": legacy.get("narrative", ""),
         "structured_traits": {
             "big_five": legacy.get("bigFive", {}),
@@ -68,6 +99,9 @@ def _resolve_persona(candidate: "Candidate") -> dict[str, Any]:
         # Legacy persona passes through for baseline_matcher compatibility.
         "_legacy": legacy,
     }
+    if verified_payload is not None:
+        persona["verified_profile"] = verified_payload
+    return persona
 
 
 def _candidate_label(candidate: "Candidate") -> str:

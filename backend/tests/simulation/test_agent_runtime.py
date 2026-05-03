@@ -236,6 +236,77 @@ def test_render_agent_turn_prompt_includes_persona_and_scenario():
     assert "Q4 targets are at risk" in prompt
 
 
+def test_candidate_prompt_includes_verified_profile_blocks():
+    """PR #1.2/1.3: capability ledger + voice samples + comm style render
+    inside the candidate's user prompt. Teammate prompts are unaffected."""
+    world = _make_world(num_teammates=1)
+    world.agents["candidate"].persona["verified_profile"] = {
+        "education": [
+            {"institution": "ETH Zurich", "degree": "MSc", "field": "CS",
+             "start": "2018", "end": "2020"},
+        ],
+        "experience": [
+            {"role": "Backend engineer", "company": "Acme",
+             "start": "2021", "end": "2024", "bullets": []},
+        ],
+        "skills": [],
+        "github_repos": [
+            {"name": "stream-toolkit", "language": "Go", "stars": 12,
+             "description": "small streaming helpers"},
+        ],
+        "capability_ledger": {
+            "known": [{"skill": "Go", "depth_evidence": ["mentioned in CV"]}],
+            "exposure_only": ["Kubernetes"],
+            "role_year_span": 3,
+        },
+        "communication_ledger": {
+            "avg_sentence_length": 14.2,
+            "hedging_rate": 0.3,
+            "voice_sample_count": 2,
+            "voice_sample_total_chars": 480,
+        },
+        "voice_samples": [
+            {"source": "github_readme",
+             "text": "honestly the way we ended up doing it was a little hacky."},
+        ],
+    }
+
+    candidate_prompt = _render_agent_turn_prompt(
+        world.agents["candidate"], world, company_name="Acme",
+    )
+    assert "VERIFIED PROFILE" in candidate_prompt
+    assert "Confidently held: Go" in candidate_prompt
+    assert "Limited exposure" in candidate_prompt
+    assert "Kubernetes" in candidate_prompt
+    assert "VOICE SAMPLES" in candidate_prompt
+    assert "honestly the way we ended up doing it" in candidate_prompt
+    assert "ETH Zurich" in candidate_prompt
+
+    teammate_prompt = _render_agent_turn_prompt(
+        world.agents["teammate:tm0"], world, company_name="Acme",
+    )
+    assert "VERIFIED PROFILE" not in teammate_prompt
+
+
+def test_candidate_prompt_renders_gap_briefing_when_present():
+    """PR #1.4: gap_briefing on world.scenario shows up in the candidate prompt."""
+    world = _make_world()
+    world.scenario["gap_briefing"] = {
+        "required_skills": ["Kubernetes operator design"],
+        "gaps": [
+            {"skill": "Kubernetes operator design", "severity": "absent",
+             "guidance": "Admit you don't know; ask clarifying questions."},
+        ],
+        "notes": "candidate ledger has no k8s evidence",
+    }
+    prompt = _render_agent_turn_prompt(
+        world.agents["candidate"], world, company_name="Acme",
+    )
+    assert "SCENARIO GAP BRIEFING" in prompt
+    assert "Kubernetes operator design" in prompt
+    assert "Admit you don't know" in prompt
+
+
 def test_turn_record_has_required_fields():
     world = _make_world()
     # Simulate what advance_turn writes.

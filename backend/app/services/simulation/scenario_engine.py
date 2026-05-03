@@ -282,13 +282,22 @@ def prepare_rollout(
     agents: dict[str, AgentState] = {}
 
     # Candidate agent
+    candidate_persona_block: dict[str, Any] = {
+        "narrative": candidate_persona.get("narrative", ""),
+        "structured_traits": candidate_persona.get("structured_traits", {}),
+        "private_goals": ["Engage authentically with the scenario."],
+    }
+    # Verified profile ledgers feed the behavioral contract block in
+    # agent_runtime. Public profile fields (education, experience, skills) are
+    # also kept here so the agent can ground its self-references in real
+    # background, while capability/communication ledgers + voice samples drive
+    # skill-gap fidelity.
+    verified_profile = candidate_persona.get("verified_profile")
+    if verified_profile:
+        candidate_persona_block["verified_profile"] = verified_profile
     agents["candidate"] = AgentState(
         agent_id="candidate",
-        persona={
-            "narrative": candidate_persona.get("narrative", ""),
-            "structured_traits": candidate_persona.get("structured_traits", {}),
-            "private_goals": ["Engage authentically with the scenario."],
-        },
+        persona=candidate_persona_block,
         memory=[],
         scratchpad={},
     )
