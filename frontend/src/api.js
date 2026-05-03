@@ -73,6 +73,15 @@ export const candidates = {
     request("/candidates/me/persona/aggregate", { method: "POST", auth: true }),
   getPersona: () =>
     request("/candidates/me/persona", { auth: true }),
+  // Verified-profile (CV/Github/portfolio extraction).
+  getProfile: () => request("/candidates/me/profile", { auth: true }),
+  patchProfile: (payload) =>
+    request("/candidates/me/profile", { method: "PATCH", body: payload, auth: true }),
+  extractProfile: () =>
+    request("/candidates/me/profile/extract", { method: "POST", auth: true }),
+  // Manager-side: any candidate's verified profile.
+  getCandidateProfile: (id) =>
+    request(`/candidates/${id}/profile`, { auth: true }),
 };
 
 // ---------- Company endpoints ----------

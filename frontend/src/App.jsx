@@ -190,14 +190,12 @@ function Masthead({ auth }) {
       </div>
       <div className="nav-bar">
         {auth.user && auth.role === "candidate" && (
-          <>
-            <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-              Dashboard
-            </NavLink>
-            <NavLink to="/intake" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-              Intake
-            </NavLink>
-          </>
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+          >
+            Dashboard
+          </NavLink>
         )}
         {auth.user && auth.role === "manager" && (
           <NavLink to="/manager" className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
