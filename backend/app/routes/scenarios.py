@@ -32,7 +32,10 @@ def _get_scenario_or_404(
     scenario_id: str, company_id: str, db: Session
 ) -> models.MomentOfTruth:
     scenario = db.get(models.MomentOfTruth, scenario_id)
-    if scenario is None or scenario.company_id != company_id:
+    if scenario is None:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+    company = db.get(models.Company, company_id)
+    if company is None or scenario.team_id != company.team_id:
         raise HTTPException(status_code=404, detail="Scenario not found")
     return scenario
 
@@ -51,10 +54,10 @@ def list_scenarios(
     company_id: str,
     db: Session = Depends(get_session),
 ) -> list[schemas.MomentOfTruthOut]:
-    _get_company_or_404(company_id, db)
+    company = _get_company_or_404(company_id, db)
     rows = (
         db.query(models.MomentOfTruth)
-        .filter_by(company_id=company_id)
+        .filter_by(team_id=company.team_id)
         .order_by(models.MomentOfTruth.ordering)
         .all()
     )
@@ -79,7 +82,7 @@ async def draft_scenario_library(
 
     # Remove auto-drafted scenarios, keep hand-authored ones.
     db.query(models.MomentOfTruth).filter(
-        models.MomentOfTruth.company_id == company_id,
+        models.MomentOfTruth.team_id == company.team_id,
         models.MomentOfTruth.is_llm_drafted == True,  # noqa: E712
     ).delete(synchronize_session=False)
 
@@ -95,7 +98,7 @@ async def draft_scenario_library(
 
     rows = (
         db.query(models.MomentOfTruth)
-        .filter_by(company_id=company_id)
+        .filter_by(team_id=company.team_id)
         .order_by(models.MomentOfTruth.ordering)
         .all()
     )
@@ -112,10 +115,10 @@ def create_scenario(
     company = _get_company_or_404(company_id, db)
     _check_scoring_dims(payload.scoring_dims, company)
 
-    # Ordering: append after existing scenarios.
-    count = db.query(models.MomentOfTruth).filter_by(company_id=company_id).count()
+    # Ordering: append after existing scenarios on this team.
+    count = db.query(models.MomentOfTruth).filter_by(team_id=company.team_id).count()
     scenario = models.MomentOfTruth(
-        company_id=company_id,
+        team_id=company.team_id,
         title=payload.title,
         scenario_type=payload.scenario_type,
         prompt=payload.prompt,

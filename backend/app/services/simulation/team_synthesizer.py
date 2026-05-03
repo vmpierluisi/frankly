@@ -464,7 +464,7 @@ async def synthesize(
         raw = await _generate_one_teammate(company, centroid, sampled_sheet, budget=budget)
 
         teammate = SyntheticTeammate(
-            company_id=company.id,
+            team_id=company.team_id,
             name=raw["name"],
             role_on_team=raw["role_on_team"],
             seniority=raw["seniority"],

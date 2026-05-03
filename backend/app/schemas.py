@@ -351,6 +351,13 @@ class LeaderboardRow(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     error_message: str | None = None
+    # Roadmap 2 / PR #2c — surface profile links so FitProfile v3 can render
+    # open-in-new-tab buttons. Hidden client-side when missing.
+    cv_path: str | None = None
+    linkedin_url: str | None = None
+    github_url: str | None = None
+    portfolio_url: str | None = None
+    profile_accuracy_score: int = 0
 
 
 class LeaderboardOut(BaseModel):
@@ -370,7 +377,7 @@ class MomentOfTruthOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    company_id: str
+    team_id: str
     title: str
     scenario_type: str
     prompt: str
@@ -417,7 +424,7 @@ class SyntheticTeammateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    company_id: str
+    team_id: str
     name: str
     role_on_team: str
     seniority: str

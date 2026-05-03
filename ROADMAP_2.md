@@ -1,6 +1,8 @@
-# Frankly / Parallax — Roadmap 2
+# frankly — Roadmap 2
 
-Long-term plan for the next major iteration of the platform. Six PRs, shipped sequentially. After each stage: test, pause, review, commit.
+Long-term plan for the next major iteration of the platform. PRs shipped sequentially. After each stage: test, pause, review, commit.
+
+> **Note**: PR #2 grew into a four-part series during execution (#2a–d) as design refined. Original numbering preserved; new sub-PRs documented under "PR #2d — Three-tier hierarchy (Org → Team → Position)".
 
 ## Guiding principles
 
@@ -106,6 +108,27 @@ Major UX restructure. iPhone-style. Where most of the demo value lives.
 - Required skills configurable per company; skill-match score visible on FitProfile.
 - Tapping any score number on FitProfile opens explanation sheet.
 - Profile accuracy ring visible on candidate Overview (initially default value; populated by PR #5).
+
+---
+
+## PR #2d — Three-tier hierarchy (Org → Team → Position)
+
+Architectural refinement after #2a–c shipped. Splits company-level config into three tiers so culture lives at the org, the simulation team lives at the team, and role-specific config lives at the position.
+
+### Sub-PRs
+
+- **#2d.1 — Backend schema split** *(done)*: new `organizations` + `teams` tables, FK columns on `companies` (= positions), data migrated, services + routes updated. Back-compat layer (legacy-kwargs `__init__` + pass-through `@property` accessors) keeps existing call sites + tests working during the transition.
+- **#2d.2 — Frontend**: Org Settings tab in recruiter dashboard, Team management page, TemplateSetup becomes "New position under {team}". Endpoints `/organizations`, `/teams`. Existing `/companies/*` routes preserved until UI fully migrates.
+- **#2d.3 — Dual-score scoring**: `skills_fit` and `behaviour_fit` always shown separately; `overall_fit = (skills_fit + behaviour_fit) / 2`. No thresholds, no flags. `skill_match_weight` removed.
+- **#2d.4 — Naming + cleanup pass** *(after #2d.3 + real-usage validation)*:
+  - Rename `Company` → `Position` (class + table) and `Match.company_id` → `position_id`. Single migration + codebase-wide rename of ~50 references across services, routes, tests, frontend.
+  - Remove the deprecated back-compat `Company.__init__` legacy-kwargs absorber.
+  - Remove the deprecated `@property` pass-throughs (`company.tagline`, `company.artifact_values`, `company.knowledge_graph`, `company.teammates`, `company.scenarios`). Update all call sites to reference `position.team.X` / `position.organization.X` explicitly.
+  - Drop the temporary `_StubCompany.team_id` test scaffolding once tests use real model fixtures.
+
+### Why #2d.4 is staged separately
+
+The renames are mechanical but invasive. Doing them while #2d.3 is still settling risks merging two failure modes (design drift + rename collisions). Once dual-score has been used in real demos and the schema design is validated, do the rename in one cohesive PR with no behavior changes.
 
 ---
 

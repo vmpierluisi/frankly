@@ -175,6 +175,11 @@ def get_leaderboard(
                 started_at=match.started_at,
                 finished_at=match.finished_at,
                 error_message=match.error_message,
+                cv_path=candidate.cv_path,
+                linkedin_url=candidate.linkedin_url,
+                github_url=candidate.github_url,
+                portfolio_url=candidate.portfolio_url,
+                profile_accuracy_score=candidate.profile_accuracy_score or 0,
             )
         )
 

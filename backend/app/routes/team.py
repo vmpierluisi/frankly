@@ -30,10 +30,10 @@ def list_team(
     company_id: str,
     db: Session = Depends(get_session),
 ) -> list[schemas.SyntheticTeammateOut]:
-    _get_company_or_404(company_id, db)
+    company = _get_company_or_404(company_id, db)
     rows = (
         db.query(models.SyntheticTeammate)
-        .filter_by(company_id=company_id)
+        .filter_by(team_id=company.team_id)
         .order_by(models.SyntheticTeammate.ordering)
         .all()
     )
@@ -49,16 +49,16 @@ async def synthesize_team(
     company_id: str,
     db: Session = Depends(get_session),
 ) -> list[schemas.SyntheticTeammateOut]:
-    """Regenerate synthetic teammates for a company.
+    """Regenerate synthetic teammates for a position's team.
 
     Deletes any existing (unedited) teammates and replaces them with a
     freshly generated set.  Teammates marked is_edited=True are preserved.
     """
     company = _get_company_or_404(company_id, db)
 
-    # Delete only auto-generated (unedited) teammates.
+    # Delete only auto-generated (unedited) teammates on this team.
     db.query(models.SyntheticTeammate).filter(
-        models.SyntheticTeammate.company_id == company_id,
+        models.SyntheticTeammate.team_id == company.team_id,
         models.SyntheticTeammate.is_edited == False,  # noqa: E712
     ).delete(synchronize_session=False)
 
@@ -74,7 +74,7 @@ async def synthesize_team(
 
     rows = (
         db.query(models.SyntheticTeammate)
-        .filter_by(company_id=company_id)
+        .filter_by(team_id=company.team_id)
         .order_by(models.SyntheticTeammate.ordering)
         .all()
     )
@@ -88,9 +88,9 @@ def update_teammate(
     payload: schemas.SyntheticTeammatePatch,
     db: Session = Depends(get_session),
 ) -> schemas.SyntheticTeammateOut:
-    _get_company_or_404(company_id, db)
+    company = _get_company_or_404(company_id, db)
     teammate = db.get(models.SyntheticTeammate, teammate_id)
-    if teammate is None or teammate.company_id != company_id:
+    if teammate is None or teammate.team_id != company.team_id:
         raise HTTPException(status_code=404, detail="Teammate not found")
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -109,9 +109,9 @@ def delete_teammate(
     teammate_id: str,
     db: Session = Depends(get_session),
 ) -> None:
-    _get_company_or_404(company_id, db)
+    company = _get_company_or_404(company_id, db)
     teammate = db.get(models.SyntheticTeammate, teammate_id)
-    if teammate is None or teammate.company_id != company_id:
+    if teammate is None or teammate.team_id != company.team_id:
         raise HTTPException(status_code=404, detail="Teammate not found")
     db.delete(teammate)
     db.commit()

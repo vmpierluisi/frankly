@@ -222,7 +222,7 @@ async def draft_scenarios(
         # Filter scoring_dims to only valid criterion keys (soft guard).
         valid_dims = [k for k in raw.get("scoring_dims", []) if k in criterion_keys]
         mot = MomentOfTruth(
-            company_id=company.id,
+            team_id=company.team_id,
             title=raw["title"],
             scenario_type=raw["type"],
             prompt=raw["prompt"],

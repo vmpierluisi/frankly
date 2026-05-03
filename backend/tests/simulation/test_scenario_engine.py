@@ -43,6 +43,7 @@ class _StubCriterion:
 
 class _StubCompany:
     id = "meridian-capital"
+    team_id = "team-meridian"
     name = "Meridian Capital"
     role = "Associate, Private Credit"
     tagline = "Patience as a competitive edge."
@@ -184,7 +185,7 @@ async def test_draft_scenarios_required_fields():
         result = await draft_scenarios(company, budget=budget)
 
     first = result[0]
-    assert first.company_id == company.id
+    assert first.team_id == company.team_id
     assert first.title == "IC Memo Under Pressure"
     assert first.scenario_type == "dyad"
     assert first.is_llm_drafted is True
