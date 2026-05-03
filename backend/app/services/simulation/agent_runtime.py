@@ -56,6 +56,33 @@ HARD RULES:
      a difficult conversation. The runtime may end the rollout early on
      this signal — use it sparingly.
 
+BEHAVIORAL CONTRACT (when a verified profile is provided, ABSOLUTE):
+  * The "VERIFIED PROFILE" section below documents the real person's
+    actual skills and communication style. Treat it as a hard ceiling
+    on what this person can demonstrate.
+  * Confidently held skills (capability_ledger.known) → unconstrained.
+  * Limited-exposure skills (capability_ledger.exposure_only) → you may
+    recognize the term and attempt, but you should hedge, ask for help,
+    or admit gaps when pressed for specifics. Probabilistic — you can
+    sometimes get the gist right, sometimes fumble. Do NOT produce
+    fluent, idiomatic, expert-level execution on these.
+  * Skills NOT in the ledger at all → deterministic. Admit you don't
+    know, ask clarifying questions, or pivot. Never fake fluency.
+  * Communication style — match the patterns in
+    "VOICE SAMPLES" (verbatim few-shot). Mirror sentence length,
+    hedging frequency, formality, and idiosyncrasies. The samples are
+    how this person ACTUALLY writes. Do not produce polished prose if
+    the samples are casual; do not produce casual prose if the samples
+    are formal.
+  * Education and experience listed in the profile are this person's
+    real background. Do not invent credentials, projects, or roles
+    that aren't there.
+  * If the SCENARIO GAP BRIEFING block is present, it lists the
+    specific gaps for this scenario — make those gaps visible in your
+    behavior in a natural, in-character way.
+  * Producing skill, vocabulary, or style beyond what is documented
+    breaks the simulation. Faithfulness > polish.
+
 LENGTH GUIDANCE:
   * utterance: 1 short paragraph for verbal turns (60-200 words);
     1-3 sentences for terse roles (e.g. a partner who decides quickly).
@@ -71,7 +98,7 @@ YOUR PERSONA
 
 YOUR STRUCTURED TRAITS (for reference)
 {trait_sheet_json}
-
+{verified_profile_block}{gap_briefing_block}
 YOUR PRIVATE GOALS IN THIS SCENARIO
 {private_goals_block}
 
@@ -163,6 +190,189 @@ def _render_conversation_so_far(turn_history: list[dict]) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Verified profile rendering (PR #1: persona faithfulness)
+# ---------------------------------------------------------------------------
+
+_MAX_VOICE_SAMPLES_RENDERED = 5
+_MAX_VOICE_SAMPLE_CHARS = 600
+_MAX_REPOS_RENDERED = 6
+_MAX_EXPERIENCE_RENDERED = 6
+
+
+def _render_education_lines(education: list[dict]) -> list[str]:
+    lines: list[str] = []
+    for e in education:
+        institution = e.get("institution") or "(unknown)"
+        degree = e.get("degree") or ""
+        field = e.get("field") or ""
+        years = " ".join(filter(None, [e.get("start", ""), e.get("end", "")]))
+        bits = [institution]
+        if degree or field:
+            bits.append(f"{degree} {field}".strip())
+        if years.strip():
+            bits.append(years.strip())
+        lines.append("  * " + " — ".join(bits))
+    return lines
+
+
+def _render_experience_lines(experience: list[dict]) -> list[str]:
+    lines: list[str] = []
+    for e in experience[:_MAX_EXPERIENCE_RENDERED]:
+        company = e.get("company") or "(unknown)"
+        role = e.get("role") or ""
+        years = "–".join(filter(None, [e.get("start", ""), e.get("end", "")]))
+        head = f"  * {role} @ {company}"
+        if years:
+            head += f" ({years})"
+        lines.append(head)
+    return lines
+
+
+def _render_capability_ledger(ledger: dict) -> list[str]:
+    if not ledger:
+        return ["  (no capability ledger available)"]
+    lines: list[str] = []
+    known = ledger.get("known") or []
+    exposure = ledger.get("exposure_only") or []
+    role_years = ledger.get("role_year_span")
+    if known:
+        named = ", ".join(
+            f"{k.get('skill')}"
+            + (f" [{'; '.join(k.get('depth_evidence', []))}]" if k.get("depth_evidence") else "")
+            for k in known
+        )
+        lines.append(f"  Confidently held: {named}")
+    else:
+        lines.append("  Confidently held: (none)")
+    if exposure:
+        lines.append(f"  Limited exposure (recognize, can't execute fluently): {', '.join(exposure)}")
+    else:
+        lines.append("  Limited exposure: (none)")
+    if role_years is not None:
+        lines.append(f"  Total documented professional years: {role_years}")
+    return lines
+
+
+def _render_communication_ledger(ledger: dict) -> list[str]:
+    if not ledger:
+        return ["  (no communication ledger available)"]
+    avg_len = ledger.get("avg_sentence_length")
+    hedging = ledger.get("hedging_rate")
+    sample_count = ledger.get("voice_sample_count", 0)
+    lines: list[str] = []
+    if avg_len is not None:
+        lines.append(f"  Average sentence length: {avg_len} words")
+    if hedging is not None:
+        try:
+            lines.append(f"  Hedging frequency: {float(hedging) * 100:.0f}% of clauses")
+        except (TypeError, ValueError):
+            pass
+    lines.append(f"  Voice sample evidence: {sample_count} samples extracted")
+    return lines
+
+
+def _render_voice_samples(samples: list[dict]) -> list[str]:
+    if not samples:
+        return ["  (no voice samples available — fall back to neutral but plain phrasing)"]
+    lines: list[str] = []
+    for s in samples[:_MAX_VOICE_SAMPLES_RENDERED]:
+        text = (s.get("text") or "").strip()
+        if not text:
+            continue
+        text = text[:_MAX_VOICE_SAMPLE_CHARS]
+        source = s.get("source", "?")
+        lines.append(f"  [{source}] {text}")
+    return lines or ["  (samples present but empty — use neutral plain phrasing)"]
+
+
+def _render_github_repos(repos: list[dict]) -> list[str]:
+    if not repos:
+        return []
+    lines: list[str] = ["  GitHub repos (top):"]
+    for r in repos[:_MAX_REPOS_RENDERED]:
+        name = r.get("name") or "(unnamed)"
+        lang = r.get("language") or "?"
+        stars = r.get("stars", 0)
+        desc = (r.get("description") or "").strip()
+        head = f"    - {name} ({lang}, ★{stars})"
+        if desc:
+            head += f" — {desc[:160]}"
+        lines.append(head)
+    return lines
+
+
+def _render_verified_profile_block(persona: dict) -> str:
+    """Render the candidate's verified profile + voice samples for the prompt.
+
+    Returns an empty string for non-candidate agents or when no verified
+    profile is attached (so teammates retain their existing prompt shape).
+    """
+    vp = persona.get("verified_profile")
+    if not vp:
+        return ""
+
+    blocks: list[str] = []
+    blocks.append("\nVERIFIED PROFILE — REAL-WORLD BACKGROUND (treat as ground truth)")
+
+    education = vp.get("education") or []
+    if education:
+        blocks.append("Education:")
+        blocks.extend(_render_education_lines(education))
+
+    experience = vp.get("experience") or []
+    if experience:
+        blocks.append("Experience (most recent first):")
+        blocks.extend(_render_experience_lines(experience))
+
+    capability = vp.get("capability_ledger") or {}
+    blocks.append("Capability ledger:")
+    blocks.extend(_render_capability_ledger(capability))
+
+    repo_lines = _render_github_repos(vp.get("github_repos") or [])
+    if repo_lines:
+        blocks.extend(repo_lines)
+
+    comm = vp.get("communication_ledger") or {}
+    blocks.append("Communication style metrics:")
+    blocks.extend(_render_communication_ledger(comm))
+
+    samples = vp.get("voice_samples") or []
+    blocks.append("VOICE SAMPLES (mirror this voice — verbatim excerpts of how this person actually writes):")
+    blocks.extend(_render_voice_samples(samples))
+
+    return "\n".join(blocks) + "\n"
+
+
+def _render_gap_briefing_block(scenario: dict) -> str:
+    """Render the per-rollout scenario→skill gap briefing if available."""
+    briefing = scenario.get("gap_briefing")
+    if not briefing:
+        return ""
+    lines = ["\nSCENARIO GAP BRIEFING (how your real-world gaps should manifest here)"]
+
+    required = briefing.get("required_skills") or []
+    if required:
+        lines.append("  Skills the scenario probes: " + ", ".join(required))
+
+    gaps = briefing.get("gaps") or []
+    if gaps:
+        lines.append("  Specific gaps to manifest:")
+        for g in gaps:
+            skill = g.get("skill", "?")
+            severity = g.get("severity", "limited")
+            guidance = g.get("guidance") or ""
+            lines.append(f"    * {skill} [{severity}] — {guidance}")
+    else:
+        lines.append("  No explicit skill gaps for this scenario; play to your strengths.")
+
+    notes = briefing.get("notes")
+    if notes:
+        lines.append(f"  Notes: {notes}")
+
+    return "\n".join(lines) + "\n"
+
+
 def _render_agent_turn_prompt(
     agent: AgentState,
     world: WorldState,
@@ -176,6 +386,13 @@ def _render_agent_turn_prompt(
     trait_sheet = persona.get("trait_sheet") or persona.get("structured_traits") or {}
     goals = persona.get("private_goals", [])
 
+    # Verified-profile + gap-briefing blocks render only for the candidate
+    # (teammate personas have no VerifiedProfile attached).
+    verified_block = _render_verified_profile_block(persona)
+    gap_block = (
+        _render_gap_briefing_block(world.scenario) if agent.agent_id == "candidate" else ""
+    )
+
     return AGENT_TURN_USER_TEMPLATE.format(
         agent_name=name,
         role_on_team=role,
@@ -183,6 +400,8 @@ def _render_agent_turn_prompt(
         company_name=company_name,
         persona_narrative=narrative,
         trait_sheet_json=json.dumps(trait_sheet, indent=2),
+        verified_profile_block=verified_block,
+        gap_briefing_block=gap_block,
         private_goals_block=_render_private_goals_block(goals),
         internal_state_history=_render_internal_state_history(agent, world.turn_history),
         scenario_prompt=world.scenario.get("prompt", ""),
@@ -232,13 +451,23 @@ async def advance_turn(
 
     user_prompt = _render_agent_turn_prompt(agent, world, company_name)
 
+    # Lower temperature when the candidate is operating under a skill-gap
+    # briefing — keeps the model closer to the deterministic/probabilistic
+    # rules in the behavioral contract instead of inventing fluent execution
+    # for skills the candidate doesn't have.
+    temperature = 0.7
+    if speaker_id == "candidate":
+        gaps = (world.scenario.get("gap_briefing") or {}).get("gaps") or []
+        if gaps:
+            temperature = 0.4
+
     raw = await tracked_chat_json(
         budget,
         system=AGENT_TURN_SYSTEM,
         user=user_prompt,
         schema=AGENT_TURN_SCHEMA,
         schema_name="agent_turn",
-        temperature=0.7,
+        temperature=temperature,
         max_tokens=600,
         model=_AGENT_MODEL,
         provider=_AGENT_PROVIDER,
