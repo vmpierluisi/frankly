@@ -88,6 +88,9 @@ class CandidateMeOut(BaseModel):
     # Roadmap 2 / PR #2a — 0..100 number for the Overview "how well we know
     # you" ring. Default 0; PR #5 calibration loop increments it.
     profile_accuracy_score: int = 0
+    # Job targets — set during intake; editable from Settings tab.
+    target_role_family: str | None = None
+    target_seniority: str | None = None
     created_at: datetime
     updated_at: datetime
     persona: PersonaSummary | None = None
@@ -99,6 +102,9 @@ class CandidateMePatchIn(BaseModel):
     github_url: str | None = None
     portfolio_url: str | None = None
     cv_path: str | None = None
+    # Roadmap 2 / PR #2b.1 — let candidates change job targets after intake.
+    target_role_family: str | None = None
+    target_seniority: str | None = None
 
 
 class VerifiedProfileOut(BaseModel):

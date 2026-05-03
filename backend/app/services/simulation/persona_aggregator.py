@@ -341,18 +341,62 @@ def _render_sjt_block(sjt_responses: dict[str, str]) -> str:
 
 
 def _load_cv_text(candidate: "Candidate") -> str:
+    """Resolve the candidate's CV bytes to plain text.
+
+    The frontend uploads CVs to the Supabase Storage bucket ``cvs`` and
+    persists the storage key on ``candidate.cv_path`` (e.g. ``user1/cv.pdf``).
+    For local-dev fixtures and seeded candidates we still support raw
+    filesystem paths. We try the local path first, fall back to Supabase
+    Storage when the path doesn't exist on disk.
+    """
     cv_path = getattr(candidate, "cv_path", None)
     if not cv_path:
         return "(none provided)"
+
+    filename = Path(cv_path).name
+    data: bytes | None = None
+
+    # Local filesystem path first (covers seeded fixtures + manager uploads).
     try:
-        p = Path(cv_path)
-        if not p.exists():
-            logger.warning("cv_path %s does not exist for candidate %s", cv_path, candidate.id)
-            return "(none provided)"
-        data = p.read_bytes()
-        text = parse_upload(filename=p.name, data=data)
-        return text or "(none provided)"
+        local = Path(cv_path)
+        if local.is_file():
+            data = local.read_bytes()
     except Exception as exc:
+        logger.debug("Local CV read failed for %s: %s", candidate.id, exc)
+
+    # Otherwise treat cv_path as a Supabase Storage object key in the cvs bucket.
+    if data is None:
+        try:
+            from ..supabase_storage import (
+                SupabaseStorageError,
+                download as storage_download,
+                is_configured as storage_configured,
+            )
+            if storage_configured():
+                data = storage_download("cvs", cv_path)
+            else:
+                logger.warning(
+                    "cv_path %s missing locally and Supabase Storage not configured "
+                    "for candidate %s — extraction will see no CV.",
+                    cv_path, candidate.id,
+                )
+        except SupabaseStorageError as exc:
+            logger.warning(
+                "Failed to fetch CV %s from Supabase Storage for candidate %s: %s",
+                cv_path, candidate.id, exc,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unexpected error loading CV for candidate %s: %s", candidate.id, exc,
+            )
+
+    if data is None:
+        return "(none provided)"
+
+    try:
+        text = parse_upload(filename=filename, data=data)
+        return text or "(none provided)"
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to parse CV for candidate %s: %s", candidate.id, exc)
         return "(none provided)"
 

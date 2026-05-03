@@ -71,7 +71,7 @@ def update_me(
     user: CurrentUser = Depends(require_candidate),
     db: Session = Depends(get_session),
 ) -> schemas.CandidateMeOut:
-    """Partial update: display_name, linkedin_url, github_url, cv_path."""
+    """Partial update: display_name, profile artefacts, and job targets."""
     candidate = (
         db.query(models.Candidate)
         .filter(models.Candidate.auth_user_id == user.auth_user_id)
@@ -80,7 +80,15 @@ def update_me(
     if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found — call GET /me first.")
 
-    for field in ("display_name", "linkedin_url", "github_url", "portfolio_url", "cv_path"):
+    for field in (
+        "display_name",
+        "linkedin_url",
+        "github_url",
+        "portfolio_url",
+        "cv_path",
+        "target_role_family",
+        "target_seniority",
+    ):
         val = getattr(payload, field)
         if val is not None:
             setattr(candidate, field, val)
@@ -539,6 +547,9 @@ def _to_me_out(candidate: models.Candidate) -> schemas.CandidateMeOut:
         portfolio_url=candidate.portfolio_url,
         assessment_status=candidate.assessment_status,
         is_seed=candidate.is_seed,
+        profile_accuracy_score=candidate.profile_accuracy_score or 0,
+        target_role_family=candidate.target_role_family,
+        target_seniority=candidate.target_seniority,
         created_at=candidate.created_at,
         updated_at=candidate.updated_at,
         persona=_persona(candidate),

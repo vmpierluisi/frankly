@@ -3,27 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { candidates } from "../api.js";
 import { GeneratingScreen, Pillar } from "../components/Widgets.jsx";
-
-// Role families and seniority levels must match backend lib/role_families.py
-const ROLE_FAMILIES = [
-  { value: "financial_analyst",  label: "Financial Analyst" },
-  { value: "software_engineer",  label: "Software Engineer" },
-  { value: "product_manager",    label: "Product Manager" },
-  { value: "data_scientist",     label: "Data Scientist" },
-  { value: "operations_manager", label: "Operations Manager" },
-  { value: "marketing_manager",  label: "Marketing Manager" },
-  { value: "sales_executive",    label: "Sales Executive" },
-  { value: "hr_business_partner", label: "HR Business Partner" },
-  { value: "legal_counsel",      label: "Legal Counsel" },
-  { value: "strategy_consultant", label: "Strategy Consultant" },
-];
-
-const SENIORITY_LEVELS = [
-  { value: "junior", label: "Junior (0–2 yrs)" },
-  { value: "mid",    label: "Mid-level (2–5 yrs)" },
-  { value: "senior", label: "Senior (5–9 yrs)" },
-  { value: "lead",   label: "Lead / Principal (9+ yrs)" },
-];
+import { ROLE_FAMILIES, SENIORITY_LEVELS } from "../lib/roleFamilies.js";
 
 export default function CandidateIntake() {
   const nav = useNavigate();
