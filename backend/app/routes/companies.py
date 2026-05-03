@@ -51,6 +51,8 @@ def create_company(
         artifact_role_spec=payload.artifact_role_spec,
         artifact_team_structure=payload.artifact_team_structure,
         artifact_sample_comms=payload.artifact_sample_comms,
+        required_skills=[s.model_dump() for s in payload.required_skills],
+        skill_match_weight=payload.skill_match_weight,
     )
     for i, crit in enumerate(payload.criteria):
         company.criteria.append(
@@ -99,6 +101,8 @@ def update_company(
     company.artifact_role_spec = payload.artifact_role_spec
     company.artifact_team_structure = payload.artifact_team_structure
     company.artifact_sample_comms = payload.artifact_sample_comms
+    company.required_skills = [s.model_dump() for s in payload.required_skills]
+    company.skill_match_weight = payload.skill_match_weight
 
     # Replace the criteria set wholesale. (The manager approves criteria as a
     # batch during template setup, so partial mutation isn't a v0 need.)

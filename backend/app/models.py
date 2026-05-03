@@ -89,6 +89,13 @@ class Candidate(Base):
         String(20), nullable=True, index=True, default=None
     )
 
+    # Roadmap 2 / PR #2a — single 0..100 number powering the candidate
+    # Overview "How well we know you" ring. Default 0; PR #5 calibration loop
+    # increments as evidence accumulates.
+    profile_accuracy_score: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow
@@ -166,6 +173,13 @@ class Company(Base):
         String(20), nullable=True, index=True, default=None
     )
     is_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Roadmap 2 / PR #2a — required skills + skill-match weight.
+    # required_skills: list of {"skill": str, "level": "junior"|"mid"|"senior"}.
+    # skill_match_weight: 0..1 fraction of overall fit driven by skills/edu/exp
+    # vs. simulation behavior (configurable per vacancy; default 0.4).
+    required_skills: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    skill_match_weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.4)
 
     # Four sanctioned artifacts — text form, already parsed.
     artifact_values: Mapped[str] = mapped_column(Text, default="")

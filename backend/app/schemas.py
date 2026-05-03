@@ -85,6 +85,9 @@ class CandidateMeOut(BaseModel):
     portfolio_url: str | None = None
     assessment_status: str = "pending"
     is_seed: bool = False
+    # Roadmap 2 / PR #2a — 0..100 number for the Overview "how well we know
+    # you" ring. Default 0; PR #5 calibration loop increments it.
+    profile_accuracy_score: int = 0
     created_at: datetime
     updated_at: datetime
     persona: PersonaSummary | None = None
@@ -113,6 +116,17 @@ class VerifiedProfileOut(BaseModel):
     edited_fields: list[str] = Field(default_factory=list)
     extracted_at: datetime
     updated_at: datetime
+
+
+class VerifiedProfilePatchIn(BaseModel):
+    """Partial update to public verified-profile fields.
+
+    Edited fields are tracked in ``edited_fields`` so subsequent
+    re-extractions don't clobber the candidate's corrections.
+    """
+    experience: list[dict[str, Any]] | None = None
+    education: list[dict[str, Any]] | None = None
+    skills: list[dict[str, Any]] | None = None
 
 
 class AssessmentSubmitIn(BaseModel):
@@ -157,6 +171,17 @@ class CriterionOut(CriterionIn):
     id: int
 
 
+class RequiredSkill(BaseModel):
+    """One row of Company.required_skills.
+
+    level: "junior" | "mid" | "senior" — required proficiency for the
+    vacancy. Used by FitProfile v3 skill-match scoring and surfaced in the
+    skill-gap briefing prompt for the candidate agent.
+    """
+    skill: str
+    level: str = "mid"
+
+
 class CompanyIn(BaseModel):
     id: str | None = None  # caller may supply a slug; otherwise server generates one
     name: str
@@ -170,6 +195,9 @@ class CompanyIn(BaseModel):
     artifact_team_structure: str = ""
     artifact_sample_comms: str = ""
     criteria: list[CriterionIn] = Field(default_factory=list)
+    # Roadmap 2 / PR #2a — required skills + behavior/skills weighting.
+    required_skills: list[RequiredSkill] = Field(default_factory=list)
+    skill_match_weight: float = 0.4
 
 
 class CompanyOut(BaseModel):
@@ -187,6 +215,8 @@ class CompanyOut(BaseModel):
     artifact_team_structure: str
     artifact_sample_comms: str
     criteria: list[CriterionOut]
+    required_skills: list[RequiredSkill] = Field(default_factory=list)
+    skill_match_weight: float = 0.4
     created_at: datetime
     updated_at: datetime
 
