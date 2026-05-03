@@ -4,6 +4,12 @@ import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { candidates, companies } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
+import Tabs from "../components/Tabs.jsx";
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "positions", label: "Positions" },
+];
 
 // Manager dashboard — position-first leaderboard surface.
 //
@@ -20,6 +26,7 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCompany, setSelectedCompany] = useState(null);
+  const [tab, setTab] = useState("overview");
 
   useEffect(() => {
     Promise.all([
@@ -39,6 +46,12 @@ export default function ManagerDashboard() {
     setError("");
   }, [selectedCompany]);
 
+  // Selecting a position from Overview should jump to the Positions tab.
+  function selectPositionAndShow(id) {
+    setSelectedCompany(id);
+    setTab("positions");
+  }
+
   if (loading) return <GeneratingScreen note="Loading dashboard…" />;
 
   const company = companyList.find((c) => c.id === selectedCompany);
@@ -56,14 +69,172 @@ export default function ManagerDashboard() {
           margin: "0 0 8px",
         }}
       >
-        Select a position. Review the candidate leaderboard.
+        {tab === "overview"
+          ? "Pipeline at a glance."
+          : "Select a position. Review the candidate leaderboard."}
       </h2>
-      <p style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 32, fontSize: 17 }}>
-        Candidates are ranked by simulation fit score — updated automatically as
-        new candidates complete intake. Screening signal only; not a hiring decision.
+      <p style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 28, fontSize: 17 }}>
+        {tab === "overview"
+          ? "Snapshot across all your open positions and the candidate pool."
+          : "Candidates are ranked by simulation fit score — updated automatically as new candidates complete intake. Screening signal only; not a hiring decision."}
       </p>
-      <hr className="rule-thick" style={{ margin: "0 0 32px" }} />
 
+      <Tabs value={tab} onChange={setTab} items={TABS} />
+
+      {error && (
+        <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
+      )}
+
+      {tab === "overview" && (
+        <OverviewTab
+          companies={companyList}
+          seedCount={seedCount}
+          onPick={selectPositionAndShow}
+          onCreate={() => nav("/manager/templates")}
+        />
+      )}
+
+      {tab === "positions" && (
+        <PositionsTab
+          nav={nav}
+          companyList={companyList}
+          seedCount={seedCount}
+          selectedCompany={selectedCompany}
+          setSelectedCompany={setSelectedCompany}
+          company={company}
+        />
+      )}
+    </main>
+  );
+}
+
+// ===========================================================================
+// Overview tab — KPI strip + open positions list
+// ===========================================================================
+function OverviewTab({ companies: companyList, seedCount, onPick, onCreate }) {
+  const open = companyList.filter((c) => c.is_open !== false);
+  const closed = companyList.length - open.length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <Stat label="Open positions" value={open.length} />
+        <Stat label="Total positions" value={companyList.length} />
+        <Stat label="Closed" value={closed} muted />
+        <Stat label="Candidate pool" value={seedCount ?? "—"} />
+      </div>
+
+      <section className="card">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div className="label-mono">Open positions</div>
+          <button
+            className="ghost"
+            onClick={onCreate}
+            style={{ padding: "8px 14px", fontSize: 11 }}
+          >
+            + New position
+          </button>
+        </div>
+        {open.length === 0 ? (
+          <p style={{ color: COLORS.muted, fontSize: 14, fontStyle: "italic" }}>
+            No open positions yet — click "+ New position" to set one up.
+          </p>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+            {open.map((c) => (
+              <li
+                key={c.id}
+                onClick={() => onPick(c.id)}
+                style={{
+                  padding: "12px 4px",
+                  borderTop: `1px solid ${COLORS.rule}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>
+                    {c.name}
+                  </div>
+                  <div style={{ color: COLORS.muted, fontSize: 13 }}>{c.role}</div>
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 10,
+                    color: COLORS.muted,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.role_family?.replace(/_/g, " ")}
+                  {c.target_seniority && ` · ${c.target_seniority}`}
+                  <span style={{ marginLeft: 12, color: COLORS.ink }}>view →</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value, muted = false }) {
+  return (
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.rule}`,
+        padding: "16px 20px",
+      }}
+    >
+      <div className="label-mono" style={{ marginBottom: 6 }}>{label}</div>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 36,
+          fontWeight: 500,
+          lineHeight: 1,
+          color: muted ? COLORS.muted : COLORS.ink,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Positions tab — original positions grid + leaderboard
+// ===========================================================================
+function PositionsTab({
+  nav,
+  companyList,
+  seedCount,
+  selectedCompany,
+  setSelectedCompany,
+  company,
+}) {
+  return (
+    <>
       {/* ── Positions grid ──────────────────────────────────────────────────── */}
       <div
         style={{
@@ -172,10 +343,6 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {error && (
-        <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
-      )}
-
       {/* ── Leaderboard ─────────────────────────────────────────────────────── */}
       {selectedCompany ? (
         <PositionLeaderboard companyId={selectedCompany} />
@@ -192,7 +359,7 @@ export default function ManagerDashboard() {
           Select a position above to see its candidate leaderboard.
         </div>
       )}
-    </main>
+    </>
   );
 }
 

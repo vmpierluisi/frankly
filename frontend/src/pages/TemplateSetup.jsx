@@ -36,8 +36,12 @@ export default function TemplateSetup() {
     artifact_role_spec: "",
     artifact_team_structure: "",
     artifact_sample_comms: "",
+    skill_match_weight: 0.4,
   });
   const [criteria, setCriteria] = useState([]);
+  // Roadmap 2 / PR #2c — required skills for this vacancy. Each row:
+  // { skill: str, level: "junior" | "mid" | "senior" }
+  const [requiredSkills, setRequiredSkills] = useState([]);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,8 +66,16 @@ export default function TemplateSetup() {
           artifact_role_spec: c.artifact_role_spec || "",
           artifact_team_structure: c.artifact_team_structure || "",
           artifact_sample_comms: c.artifact_sample_comms || "",
+          skill_match_weight:
+            typeof c.skill_match_weight === "number" ? c.skill_match_weight : 0.4,
         });
         setCriteria(c.criteria || []);
+        setRequiredSkills(
+          (c.required_skills || []).map((s) => ({
+            skill: s.skill || "",
+            level: s.level || "mid",
+          }))
+        );
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -147,6 +159,10 @@ export default function TemplateSetup() {
       id: form.id || undefined,
       role_family: form.role_family || null,
       target_seniority: form.target_seniority || null,
+      skill_match_weight: clamp01(Number(form.skill_match_weight) || 0.4),
+      required_skills: requiredSkills
+        .map((s) => ({ skill: (s.skill || "").trim(), level: s.level || "mid" }))
+        .filter((s) => s.skill),
       criteria: criteria.map(({ id, ordering, ...c }) => ({
         ...c,
         weight: Number(c.weight) || 0,
@@ -427,6 +443,122 @@ export default function TemplateSetup() {
         </div>
       )}
 
+      {/* ── Required skills + skill-match weight (Roadmap 2 / PR #2c) ──────── */}
+      <hr className="rule" style={{ margin: "32px 0" }} />
+      <div className="label-mono" style={{ marginBottom: 6 }}>4. Required skills</div>
+      <p style={{ color: COLORS.muted, fontSize: 14, margin: "0 0 18px" }}>
+        The skills the simulation should pressure-test. The candidate's
+        capability ledger gets compared against these — gaps surface in the
+        agent's behaviour and feed the skill-match score.
+      </p>
+
+      {requiredSkills.length === 0 && (
+        <div
+          style={{
+            color: COLORS.muted,
+            fontSize: 14,
+            fontStyle: "italic",
+            marginBottom: 12,
+          }}
+        >
+          No required skills yet — add one to start.
+        </div>
+      )}
+
+      {requiredSkills.map((row, i) => (
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 200px auto",
+            gap: 10,
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <input
+            className="ed"
+            value={row.skill}
+            onChange={(e) =>
+              setRequiredSkills(
+                requiredSkills.map((r, j) =>
+                  j === i ? { ...r, skill: e.target.value } : r
+                )
+              )
+            }
+            placeholder="e.g. Python, financial modelling, k8s operator design"
+          />
+          <select
+            className="ed"
+            value={row.level}
+            onChange={(e) =>
+              setRequiredSkills(
+                requiredSkills.map((r, j) =>
+                  j === i ? { ...r, level: e.target.value } : r
+                )
+              )
+            }
+            style={{ cursor: "pointer", fontFamily: FONT_MONO, fontSize: 13 }}
+          >
+            <option value="junior">junior</option>
+            <option value="mid">mid</option>
+            <option value="senior">senior</option>
+          </select>
+          <button
+            className="ghost"
+            onClick={() =>
+              setRequiredSkills(requiredSkills.filter((_, j) => j !== i))
+            }
+            style={{ padding: "8px 12px" }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <button
+        className="ghost"
+        onClick={() =>
+          setRequiredSkills([...requiredSkills, { skill: "", level: "mid" }])
+        }
+        style={{ padding: "8px 14px", marginTop: 4 }}
+      >
+        + Add required skill
+      </button>
+
+      <div style={{ marginTop: 28 }}>
+        <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
+          Skill / experience weight in overall fit
+        </label>
+        <p style={{ color: COLORS.muted, fontSize: 13, margin: "0 0 10px" }}>
+          Fraction of the overall fit score driven by skills + education +
+          experience match (vs. behavioural simulation). Default 0.4.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, maxWidth: 520 }}>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={form.skill_match_weight}
+            onChange={(e) => update("skill_match_weight", Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 13,
+              minWidth: 110,
+              textAlign: "right",
+              color: COLORS.muted,
+            }}
+          >
+            skills {Math.round((form.skill_match_weight || 0) * 100)}% · behaviour{" "}
+            {Math.round((1 - (form.skill_match_weight || 0)) * 100)}%
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div style={{ color: COLORS.accent, marginTop: 24, fontStyle: "italic" }}>{error}</div>
       )}
@@ -439,4 +571,8 @@ export default function TemplateSetup() {
       </div>
     </main>
   );
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }

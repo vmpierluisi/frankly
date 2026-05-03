@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { companies, matches } from "../api.js";
-import FitProfileV2 from "./FitProfileV2.jsx";
+import FitProfileV3 from "./FitProfileV3.jsx";
 import { GeneratingScreen } from "./Widgets.jsx";
 
 const POLL_INTERVAL_MS = 5000;
@@ -310,8 +310,17 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
             background: "#fafafa",
           }}
         >
-          <FitProfileV2
+          <FitProfileV3
             report={{ ...row.report, matchId: row.match_id }}
+            candidate={{
+              id: row.candidate_id,
+              display_name: row.display_name,
+              cv_path: row.cv_path,
+              linkedin_url: row.linkedin_url,
+              github_url: row.github_url,
+              portfolio_url: row.portfolio_url,
+              profile_accuracy_score: row.profile_accuracy_score || 0,
+            }}
             criteriaIndex={criteriaIndex}
           />
         </div>

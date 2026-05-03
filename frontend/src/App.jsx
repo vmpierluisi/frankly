@@ -185,7 +185,7 @@ function Masthead({ auth }) {
             letterSpacing: "-0.01em",
           }}
         >
-          Parallax<span style={{ color: COLORS.accent }}>.</span>
+          frankly<span style={{ color: COLORS.accent }}>.</span>
         </div>
       </div>
       <div className="nav-bar">
