@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { candidates, companies, organizations } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 import Tabs from "../components/Tabs.jsx";
+import KebabMenu from "../components/KebabMenu.jsx";
+import NewPositionModal from "../components/NewPositionModal.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -22,12 +24,41 @@ const TABS = [
 
 export default function ManagerDashboard() {
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [companyList, setCompanyList] = useState([]);
   const [seedCount, setSeedCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCompany, setSelectedCompany] = useState(null);
-  const [tab, setTab] = useState("overview");
+  // Tab is mirrored into ?tab=... so other routes can deep-link
+  // ("Positions / + New position" → /manager?tab=settings).
+  const initialTab = searchParams.get("tab") || "overview";
+  const [tab, setTab] = useState(initialTab);
+
+  // Keep the URL in sync when the user switches tabs in the UI.
+  function changeTab(next) {
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "overview") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  }
+
+  // React to back/forward / external nav.
+  useEffect(() => {
+    const t = searchParams.get("tab") || "overview";
+    if (t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const [newPositionOpen, setNewPositionOpen] = useState(false);
+  function openNewPosition() {
+    setNewPositionOpen(true);
+  }
+  function pickedTeam({ team }) {
+    setNewPositionOpen(false);
+    if (team) nav(`/manager/templates?team_id=${team.id}`);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -50,7 +81,7 @@ export default function ManagerDashboard() {
   // Selecting a position from Overview should jump to the Positions tab.
   function selectPositionAndShow(id) {
     setSelectedCompany(id);
-    setTab("positions");
+    changeTab("positions");
   }
 
   if (loading) return <GeneratingScreen note="Loading dashboard…" />;
@@ -80,7 +111,7 @@ export default function ManagerDashboard() {
           : "Candidates are ranked by simulation fit score — updated automatically as new candidates complete intake. Screening signal only; not a hiring decision."}
       </p>
 
-      <Tabs value={tab} onChange={setTab} items={TABS} />
+      <Tabs value={tab} onChange={changeTab} items={TABS} />
 
       {error && (
         <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
@@ -91,13 +122,14 @@ export default function ManagerDashboard() {
           companies={companyList}
           seedCount={seedCount}
           onPick={selectPositionAndShow}
-          onCreate={() => nav("/manager/templates")}
+          onCreate={openNewPosition}
         />
       )}
 
       {tab === "positions" && (
         <PositionsTab
           nav={nav}
+          onCreate={openNewPosition}
           companyList={companyList}
           seedCount={seedCount}
           selectedCompany={selectedCompany}
@@ -107,6 +139,12 @@ export default function ManagerDashboard() {
       )}
 
       {tab === "settings" && <SettingsTab nav={nav} />}
+
+      <NewPositionModal
+        open={newPositionOpen}
+        onClose={() => setNewPositionOpen(false)}
+        onPick={pickedTeam}
+      />
     </main>
   );
 }
@@ -274,7 +312,7 @@ function OverviewTab({ companies: companyList, seedCount, onPick, onCreate }) {
             onClick={onCreate}
             style={{ padding: "8px 14px", fontSize: 11 }}
           >
-            + New position
+            + New Position
           </button>
         </div>
         {open.length === 0 ? (
@@ -356,6 +394,7 @@ function Stat({ label, value, muted = false }) {
 // ===========================================================================
 function PositionsTab({
   nav,
+  onCreate,
   companyList,
   seedCount,
   selectedCompany,
@@ -393,10 +432,10 @@ function PositionsTab({
         </div>
         <button
           className="ghost"
-          onClick={() => nav("/manager/templates")}
+          onClick={onCreate}
           style={{ padding: "8px 14px" }}
         >
-          + New position
+          + New Position
         </button>
       </div>
 
@@ -425,52 +464,6 @@ function PositionsTab({
           </p>
         )}
       </div>
-
-      {/* ── Action bar (shown once a position is selected) ──────────────────── */}
-      {selectedCompany && (
-        <div
-          className="card"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            marginBottom: 32,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="label-mono" style={{ marginBottom: 4 }}>Selected position</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500 }}>
-              {company?.name}
-            </div>
-            <div style={{ color: COLORS.muted, fontSize: 14 }}>{company?.role}</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/companies/${selectedCompany}/team`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Team
-            </button>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/companies/${selectedCompany}/scenarios`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Scenarios
-            </button>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/templates/${selectedCompany}`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Edit position
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Leaderboard ─────────────────────────────────────────────────────── */}
       {selectedCompany ? (
@@ -537,21 +530,15 @@ function PositionCard({ company, selected, onSelect, onEdit, onViewTeam, onViewS
           </div>
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-        <button
-          className="ghost"
-          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
-          onClick={onViewTeam}
-        >
-          Team
-        </button>
-        <button
-          className="ghost"
-          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
-          onClick={onEdit}
-        >
-          Edit
-        </button>
+      <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+        <KebabMenu
+          ariaLabel={`Actions for ${company.name}`}
+          items={[
+            { label: "Team", onClick: onViewTeam },
+            { label: "Scenarios", onClick: onViewScenarios },
+            { label: "Edit", onClick: onEdit },
+          ]}
+        />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, templates } from "../api.js";
+import { companies, organizations, teams, templates } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 
 // Manager-facing template setup. Two-step flow:
@@ -29,6 +29,11 @@ export default function TemplateSetup() {
   // already live on the parent Org/Team.
   const teamIdParam = searchParams.get("team_id") || null;
   const positionOnly = !!teamIdParam || !!companyId;
+
+  // Roadmap 2 / PR #2d.2: position creation must happen under an existing
+  // team. We no longer support the bare "/manager/templates" no-context flow
+  // — it leaked org-level + team-level fields into per-vacancy forms.
+  const missingContext = !companyId && !teamIdParam;
 
   const [form, setForm] = useState({
     id: "",
@@ -86,6 +91,25 @@ export default function TemplateSetup() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [companyId]);
+
+  // PR #2d.2: when creating a position under a team, prefill the position's
+  // Name from the parent organization's name. The Name field is then locked
+  // in the UI — recruiters edit org names from Settings, not here.
+  useEffect(() => {
+    if (!teamIdParam || companyId) return;
+    let cancelled = false;
+    teams
+      .get(teamIdParam)
+      .then(async (team) => {
+        const org = await organizations.get(team.organization_id);
+        if (cancelled) return;
+        setForm((f) => ({ ...f, name: org.name }));
+      })
+      .catch((e) => setError(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [teamIdParam, companyId]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -188,6 +212,37 @@ export default function TemplateSetup() {
 
   if (loading) return <GeneratingScreen note="Loading company…" />;
 
+  if (missingContext) {
+    return (
+      <main className="container" style={{ maxWidth: 600 }}>
+        <div className="label-mono" style={{ marginBottom: 12 }}>
+          Manager · New position
+        </div>
+        <h2
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 32,
+            fontWeight: 500,
+            margin: "0 0 12px",
+          }}
+        >
+          Pick a team first.
+        </h2>
+        <p style={{ color: COLORS.muted, fontSize: 16, marginBottom: 20 }}>
+          Positions live under teams, which live under organizations. Open
+          Settings, pick (or create) an organization, then pick a team and use
+          its “+ New position” button.
+        </p>
+        <button
+          className="primary"
+          onClick={() => nav("/manager?tab=settings")}
+        >
+          Go to Settings →
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <div className="label-mono" style={{ marginBottom: 12 }}>
@@ -215,16 +270,34 @@ export default function TemplateSetup() {
       <div className="label-mono" style={{ marginBottom: 12 }}>1. Identity</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Name</label>
-          <input
-            className="ed"
-            value={form.name}
-            onChange={(e) => update("name", e.target.value)}
-            placeholder="Meridian Capital Partners"
-            autoComplete="off"
-            data-form-type="other"
-            data-lpignore="true"
-          />
+          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
+            Name
+          </label>
+          {positionOnly ? (
+            <div
+              style={{
+                padding: "12px 14px",
+                border: `1px solid ${COLORS.rule}`,
+                background: COLORS.paper,
+                fontFamily: FONT_DISPLAY,
+                fontSize: 16,
+                color: COLORS.ink,
+              }}
+              title="Inherited from the organization. Edit org name in Settings."
+            >
+              {form.name || "(loading…)"}
+            </div>
+          ) : (
+            <input
+              className="ed"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="Meridian Capital Partners"
+              autoComplete="off"
+              data-form-type="other"
+              data-lpignore="true"
+            />
+          )}
         </div>
         <div>
           <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Role</label>
