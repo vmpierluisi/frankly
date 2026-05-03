@@ -188,8 +188,121 @@ class RequiredSkill(BaseModel):
     level: str = "mid"
 
 
+# ----------------------------------------------------------------------------
+# Roadmap 2 / PR #2d — Organization + Team schemas.
+# ----------------------------------------------------------------------------
+class OrganizationIn(BaseModel):
+    name: str
+    tagline: str | None = None
+    mission: str = ""
+    code_of_conduct: str = ""
+
+
+class OrganizationPatch(BaseModel):
+    name: str | None = None
+    tagline: str | None = None
+    mission: str | None = None
+    code_of_conduct: str | None = None
+
+
+class OrganizationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    tagline: str | None = None
+    mission: str = ""
+    code_of_conduct: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class TeamIn(BaseModel):
+    name: str
+    artifact_team_structure: str = ""
+    artifact_sample_comms: str = ""
+
+
+class TeamPatch(BaseModel):
+    name: str | None = None
+    artifact_team_structure: str | None = None
+    artifact_sample_comms: str | None = None
+
+
+class TeamOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    organization_id: str
+    name: str
+    artifact_team_structure: str = ""
+    artifact_sample_comms: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class PositionOut(BaseModel):
+    """Slim list-item view of a position (Company internally).
+
+    Used by ``GET /teams/{team_id}/positions``.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    team_id: str
+    organization_id: str
+    name: str
+    role: str
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool = True
+
+
+class OrganizationDetailOut(OrganizationOut):
+    teams: list[TeamOut] = Field(default_factory=list)
+
+
+class TeamDetailOut(TeamOut):
+    positions: list[PositionOut] = Field(default_factory=list)
+
+
 class CompanyIn(BaseModel):
+    """Position create/update payload.
+
+    PR #2d: Org-level fields (tagline, artifact_values) and team-level
+    fields (artifact_team_structure, artifact_sample_comms) used to live
+    here. They've moved to Organization / Team. ``team_id`` lets a caller
+    create a position under an existing team. When absent, the route's
+    legacy fallback auto-creates a fresh Org + Team (compat for the old
+    TemplateSetup form).
+    """
     id: str | None = None  # caller may supply a slug; otherwise server generates one
+    team_id: str | None = None
+    name: str
+    role: str
+    role_family: str | None = None
+    target_seniority: str | None = None
+    is_open: bool = True
+    artifact_role_spec: str = ""
+    criteria: list[CriterionIn] = Field(default_factory=list)
+    required_skills: list[RequiredSkill] = Field(default_factory=list)
+
+    # ⚠️ DEPRECATED legacy fields — accepted but ignored. PR #2d.4 removes.
+    # The old TemplateSetup form still posts these; new flows should use the
+    # Org / Team endpoints instead.
+    tagline: str | None = None
+    artifact_values: str | None = None
+    artifact_team_structure: str | None = None
+    artifact_sample_comms: str | None = None
+    skill_match_weight: float | None = None
+
+
+class CompanyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    organization_id: str
+    team_id: str
     name: str
     tagline: str | None = None
     role: str
@@ -200,29 +313,8 @@ class CompanyIn(BaseModel):
     artifact_role_spec: str = ""
     artifact_team_structure: str = ""
     artifact_sample_comms: str = ""
-    criteria: list[CriterionIn] = Field(default_factory=list)
-    # Roadmap 2 / PR #2a — required skills + behavior/skills weighting.
-    required_skills: list[RequiredSkill] = Field(default_factory=list)
-    skill_match_weight: float = 0.4
-
-
-class CompanyOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    name: str
-    tagline: str | None = None
-    role: str
-    role_family: str | None = None
-    target_seniority: str | None = None
-    is_open: bool = True
-    artifact_values: str
-    artifact_role_spec: str
-    artifact_team_structure: str
-    artifact_sample_comms: str
     criteria: list[CriterionOut]
     required_skills: list[RequiredSkill] = Field(default_factory=list)
-    skill_match_weight: float = 0.4
     created_at: datetime
     updated_at: datetime
 

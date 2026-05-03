@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates, companies } from "../api.js";
+import { candidates, companies, organizations } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 import Tabs from "../components/Tabs.jsx";
@@ -9,6 +9,7 @@ import Tabs from "../components/Tabs.jsx";
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "positions", label: "Positions" },
+  { id: "settings", label: "Settings" },
 ];
 
 // Manager dashboard — position-first leaderboard surface.
@@ -104,7 +105,135 @@ export default function ManagerDashboard() {
           company={company}
         />
       )}
+
+      {tab === "settings" && <SettingsTab nav={nav} />}
     </main>
+  );
+}
+
+// ===========================================================================
+// Settings tab — Organizations management.
+// Roadmap 2 / PR #2d.2: org owns culture (mission, code_of_conduct, tagline);
+// each org owns one or more teams; positions live under teams.
+// ===========================================================================
+function SettingsTab({ nav }) {
+  const [orgs, setOrgs] = useState(null);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    organizations
+      .list()
+      .then(setOrgs)
+      .catch((e) => setError(e.message));
+  }, []);
+
+  async function createOrg() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const created = await organizations.create({
+        name: newName.trim(),
+        tagline: null,
+        mission: "",
+        code_of_conduct: "",
+      });
+      nav(`/manager/organizations/${created.id}`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (orgs === null && !error) {
+    return (
+      <div style={{ padding: "32px 0", color: COLORS.muted, fontStyle: "italic" }}>
+        Loading organizations…
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {error && (
+        <div style={{ color: COLORS.accent, fontStyle: "italic" }}>{error}</div>
+      )}
+
+      <section className="card">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div className="label-mono">Organizations</div>
+        </div>
+        <p style={{ color: COLORS.muted, fontSize: 14, margin: "0 0 18px" }}>
+          Mission and code of conduct live here — uploaded once per
+          organization, reused across every team and position. Click an
+          organization to manage its teams.
+        </p>
+
+        {(orgs || []).length === 0 ? (
+          <div style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 18 }}>
+            No organizations yet.
+          </div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", marginBottom: 18 }}>
+            {(orgs || []).map((o) => (
+              <li
+                key={o.id}
+                onClick={() => nav(`/manager/organizations/${o.id}`)}
+                style={{
+                  padding: "12px 4px",
+                  borderTop: `1px solid ${COLORS.rule}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>
+                    {o.name}
+                  </div>
+                  {o.tagline && (
+                    <div style={{ color: COLORS.muted, fontSize: 13 }}>{o.tagline}</div>
+                  )}
+                </div>
+                <span className="label-mono" style={{ fontSize: 11, color: COLORS.ink }}>
+                  manage →
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <input
+            className="ed"
+            value={newName}
+            placeholder="New organization name"
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createOrg();
+            }}
+          />
+          <button
+            className="ghost"
+            onClick={createOrg}
+            disabled={creating || !newName.trim()}
+            style={{ padding: "12px 18px", whiteSpace: "nowrap" }}
+          >
+            {creating ? "Creating…" : "+ New organization"}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 

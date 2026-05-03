@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { companies, templates } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
@@ -23,6 +23,12 @@ const ARTIFACT_FIELDS = [
 export default function TemplateSetup() {
   const nav = useNavigate();
   const { companyId } = useParams();
+  const [searchParams] = useSearchParams();
+  // PR #2d.2 — when a team_id is supplied, this is a position-creation flow
+  // under that team; org-level + team-level fields are hidden because they
+  // already live on the parent Org/Team.
+  const teamIdParam = searchParams.get("team_id") || null;
+  const positionOnly = !!teamIdParam || !!companyId;
 
   const [form, setForm] = useState({
     id: "",
@@ -157,9 +163,9 @@ export default function TemplateSetup() {
     const payload = {
       ...form,
       id: form.id || undefined,
+      team_id: teamIdParam || undefined,
       role_family: form.role_family || null,
       target_seniority: form.target_seniority || null,
-      skill_match_weight: clamp01(Number(form.skill_match_weight) || 0.4),
       required_skills: requiredSkills
         .map((s) => ({ skill: (s.skill || "").trim(), level: s.level || "mid" }))
         .filter((s) => s.skill),
@@ -304,7 +310,17 @@ export default function TemplateSetup() {
 
       {/* Artifacts */}
       <div className="label-mono" style={{ marginBottom: 12 }}>2. Sanctioned artifacts</div>
-      {ARTIFACT_FIELDS.map((f) => (
+      {positionOnly && (
+        <p style={{ color: COLORS.muted, fontSize: 13, margin: "0 0 18px" }}>
+          Org-level artefacts (values) and team-level artefacts (team structure
+          + sample communication) live on the parent organization and team —
+          edit those from <em>Settings</em>. This page only collects the
+          role-specification artefact.
+        </p>
+      )}
+      {ARTIFACT_FIELDS.filter(
+        (f) => !positionOnly || f.key === "artifact_role_spec"
+      ).map((f) => (
         <div key={f.key} style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
             <label

@@ -9,7 +9,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import SessionLocal, init_db
-from .routes import admin, candidates, companies, matches, scenarios, team, templates
+from .routes import (
+    admin,
+    candidates,
+    companies,
+    matches,
+    organizations,
+    scenarios,
+    team,
+    teams,
+    templates,
+)
 from .schemas import HealthOut
 from .seed_data import seed_companies, backfill_company_role_families
 from .services.simulation import background_runner
@@ -76,3 +86,5 @@ app.include_router(templates.router)
 app.include_router(matches.router)
 app.include_router(team.router)
 app.include_router(scenarios.router)
+app.include_router(organizations.router)
+app.include_router(teams.router)

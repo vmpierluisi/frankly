@@ -84,7 +84,36 @@ export const candidates = {
     request(`/candidates/${id}/profile`, { auth: true }),
 };
 
-// ---------- Company endpoints ----------
+// ---------- Organization endpoints (Roadmap 2 / PR #2d) ----------
+export const organizations = {
+  list: () => request("/organizations", { auth: true }),
+  get: (id) => request(`/organizations/${id}`, { auth: true }),
+  create: (payload) =>
+    request("/organizations", { method: "POST", body: payload, auth: true }),
+  update: (id, payload) =>
+    request(`/organizations/${id}`, { method: "PATCH", body: payload, auth: true }),
+  remove: (id) =>
+    request(`/organizations/${id}`, { method: "DELETE", auth: true, raw: true }),
+  listTeams: (id) => request(`/organizations/${id}/teams`, { auth: true }),
+  createTeam: (id, payload) =>
+    request(`/organizations/${id}/teams`, {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }),
+};
+
+// ---------- Team endpoints ----------
+export const teams = {
+  get: (id) => request(`/teams/${id}`, { auth: true }),
+  update: (id, payload) =>
+    request(`/teams/${id}`, { method: "PATCH", body: payload, auth: true }),
+  remove: (id) =>
+    request(`/teams/${id}`, { method: "DELETE", auth: true, raw: true }),
+  listPositions: (id) => request(`/teams/${id}/positions`, { auth: true }),
+};
+
+// ---------- Company endpoints (legacy: a Company is a Position) ----------
 export const companies = {
   list: () => request("/companies", { auth: true }),
   get: (id) => request(`/companies/${id}`, { auth: true }),
