@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple, TYPE_CHECKING, Any
 
+from . import PROMPT_VERSION
 from .cost_tracker import CostBudget, tracked_chat_json
 from .rollout_logger import log_event
 from ...config import settings
@@ -338,6 +339,7 @@ async def score_rollout(
                     judge_model=_JUDGE_MODEL_TAG,
                     judge_seed_index=0,
                     confidence=0.0,
+                    prompt_version=PROMPT_VERSION,
                 )
                 for c in criteria
             ],
@@ -375,6 +377,7 @@ async def score_rollout(
             judge_model=_JUDGE_MODEL_TAG,
             judge_seed_index=0,
             confidence=confidence,
+            prompt_version=PROMPT_VERSION,
         )
         result.append(row)
 

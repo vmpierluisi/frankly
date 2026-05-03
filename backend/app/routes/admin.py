@@ -266,6 +266,211 @@ def get_match_logs(
 # GET /admin/logs/training-export
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# GET /admin/sim-health
+#
+# Roadmap 2 / PR #1.11. Backtesting analytics: per-vacancy + per-prompt-version
+# rollouts of fidelity scores, retry rates, and judge confidence. Lets the
+# operator answer questions like "how many low-fidelity rollouts did we get
+# for vacancy X this week?" or "did the latest prompt version actually
+# improve fidelity vs the prior one?".
+#
+# All queries grouped by ``rollouts.prompt_version`` so analytics never mix
+# rollouts produced by different prompt scaffolding.
+# ---------------------------------------------------------------------------
+
+@router.get("/sim-health", dependencies=[Depends(_require_admin)])
+def sim_health(
+    company_id: str | None = None,
+    prompt_version: str | None = None,
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Return aggregate health metrics across recent simulation activity.
+
+    Query parameters
+    ----------------
+    company_id : optional — filter to a single vacancy.
+    prompt_version : optional — filter to a single prompt version.
+
+    Response shape
+    --------------
+    {
+      "filters": {...},
+      "totals": { "matches", "rollouts", "rollouts_superseded", ... },
+      "fidelity": { "n", "mean", "low_count", "low_rate", "violation_kinds": {...} },
+      "criteria_judge_confidence": { "n", "mean" },
+      "by_company": [ { company_id, ..., metrics }, ... ],
+      "by_prompt_version": [ { prompt_version, ..., metrics }, ... ]
+    }
+    """
+    from collections import Counter
+
+    rollout_q = select(models.Rollout)
+    if company_id is not None:
+        rollout_q = rollout_q.join(
+            models.Match, models.Match.id == models.Rollout.match_id,
+        ).where(models.Match.company_id == company_id)
+    if prompt_version is not None:
+        rollout_q = rollout_q.where(models.Rollout.prompt_version == prompt_version)
+    rollouts = db.execute(rollout_q).scalars().all()
+    rollout_ids = [r.id for r in rollouts]
+
+    scores: list[models.RolloutScore] = []
+    if rollout_ids:
+        scores = db.execute(
+            select(models.RolloutScore).where(
+                models.RolloutScore.rollout_id.in_(rollout_ids),
+            )
+        ).scalars().all()
+
+    # ---- Top-level metrics ---------------------------------------------------
+    fidelity_scores = [
+        s for s in scores
+        if s.dimension_key == "persona_fidelity" and s.score is not None
+    ]
+    criterion_scores = [
+        s for s in scores
+        if s.dimension_key != "persona_fidelity" and s.score is not None
+    ]
+
+    fidelity_values = [float(s.score) for s in fidelity_scores]
+    fidelity_low = [v for v in fidelity_values if v < 60]
+
+    # Aggregate violation kinds across rollouts that exposed them in final_state.
+    violation_kinds: Counter[str] = Counter()
+    for r in rollouts:
+        fs = (r.final_state or {}).get("persona_fidelity") or {}
+        for v in fs.get("violations", []):
+            kind = v.get("kind")
+            if kind:
+                violation_kinds[kind] += 1
+
+    superseded = sum(1 for r in rollouts if r.status == "superseded")
+
+    match_ids = {r.match_id for r in rollouts}
+
+    fidelity_block = {
+        "n": len(fidelity_values),
+        "mean": round(_mean(fidelity_values), 1) if fidelity_values else None,
+        "low_count": len(fidelity_low),
+        "low_rate": round(len(fidelity_low) / len(fidelity_values), 3)
+            if fidelity_values else None,
+        "violation_kinds": dict(violation_kinds),
+    }
+
+    criteria_block = {
+        "n": len(criterion_scores),
+        "mean_confidence": round(
+            _mean([float(s.confidence or 0.0) for s in criterion_scores]), 3
+        ) if criterion_scores else None,
+    }
+
+    totals = {
+        "matches": len(match_ids),
+        "rollouts": len(rollouts),
+        "rollouts_superseded": superseded,
+        "retry_rate": round(superseded / len(rollouts), 3) if rollouts else None,
+    }
+
+    # ---- Group: by_company ---------------------------------------------------
+    by_company: dict[str, dict[str, Any]] = {}
+    if rollouts:
+        match_company = dict(
+            db.execute(
+                select(models.Match.id, models.Match.company_id).where(
+                    models.Match.id.in_(match_ids)
+                )
+            ).all()
+        )
+        scores_by_rollout: dict[str, list[models.RolloutScore]] = {}
+        for s in scores:
+            scores_by_rollout.setdefault(s.rollout_id, []).append(s)
+
+        for r in rollouts:
+            cid = match_company.get(r.match_id, "unknown")
+            bucket = by_company.setdefault(cid, {
+                "company_id": cid,
+                "rollouts": 0,
+                "superseded": 0,
+                "fidelity_n": 0,
+                "fidelity_low": 0,
+                "fidelity_sum": 0.0,
+            })
+            bucket["rollouts"] += 1
+            if r.status == "superseded":
+                bucket["superseded"] += 1
+            for s in scores_by_rollout.get(r.id, []):
+                if s.dimension_key == "persona_fidelity" and s.score is not None:
+                    bucket["fidelity_n"] += 1
+                    bucket["fidelity_sum"] += float(s.score)
+                    if s.score < 60:
+                        bucket["fidelity_low"] += 1
+
+    company_rows = []
+    for c in by_company.values():
+        n = c["fidelity_n"]
+        company_rows.append({
+            "company_id": c["company_id"],
+            "rollouts": c["rollouts"],
+            "superseded": c["superseded"],
+            "fidelity_n": n,
+            "fidelity_mean": round(c["fidelity_sum"] / n, 1) if n else None,
+            "fidelity_low_count": c["fidelity_low"],
+            "fidelity_low_rate": round(c["fidelity_low"] / n, 3) if n else None,
+        })
+    company_rows.sort(key=lambda x: -x["rollouts"])
+
+    # ---- Group: by_prompt_version -------------------------------------------
+    by_pv: dict[str, dict[str, Any]] = {}
+    rollout_pv = {r.id: r.prompt_version for r in rollouts}
+    for r in rollouts:
+        pv = r.prompt_version or "legacy"
+        bucket = by_pv.setdefault(pv, {
+            "prompt_version": pv,
+            "rollouts": 0,
+            "superseded": 0,
+            "fidelity_n": 0,
+            "fidelity_low": 0,
+            "fidelity_sum": 0.0,
+        })
+        bucket["rollouts"] += 1
+        if r.status == "superseded":
+            bucket["superseded"] += 1
+    for s in fidelity_scores:
+        pv = rollout_pv.get(s.rollout_id) or "legacy"
+        bucket = by_pv.setdefault(pv, {
+            "prompt_version": pv, "rollouts": 0, "superseded": 0,
+            "fidelity_n": 0, "fidelity_low": 0, "fidelity_sum": 0.0,
+        })
+        bucket["fidelity_n"] += 1
+        bucket["fidelity_sum"] += float(s.score)
+        if s.score < 60:
+            bucket["fidelity_low"] += 1
+
+    pv_rows = []
+    for c in by_pv.values():
+        n = c["fidelity_n"]
+        pv_rows.append({
+            "prompt_version": c["prompt_version"],
+            "rollouts": c["rollouts"],
+            "superseded": c["superseded"],
+            "fidelity_n": n,
+            "fidelity_mean": round(c["fidelity_sum"] / n, 1) if n else None,
+            "fidelity_low_count": c["fidelity_low"],
+            "fidelity_low_rate": round(c["fidelity_low"] / n, 3) if n else None,
+        })
+    pv_rows.sort(key=lambda x: x["prompt_version"])
+
+    return {
+        "filters": {"company_id": company_id, "prompt_version": prompt_version},
+        "totals": totals,
+        "fidelity": fidelity_block,
+        "criteria_judge_confidence": criteria_block,
+        "by_company": company_rows,
+        "by_prompt_version": pv_rows,
+    }
+
+
 @router.get("/logs/training-export", dependencies=[Depends(_require_admin)])
 def training_export(db: Session = Depends(get_session)) -> StreamingResponse:
     """Stream all RolloutLog rows as NDJSON (one JSON object per line)."""
