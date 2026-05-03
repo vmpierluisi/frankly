@@ -91,8 +91,106 @@ def update_me(
 
 
 # ---------------------------------------------------------------------------
-# Candidate self-service — verified profile extraction
+# Candidate self-service — verified profile (read + edit + extract)
 # ---------------------------------------------------------------------------
+@router.get(
+    "/me/profile",
+    response_model=schemas.VerifiedProfileOut,
+    summary="Get the signed-in candidate's extracted verified profile.",
+)
+def get_my_profile(
+    user: CurrentUser = Depends(require_candidate),
+    db: Session = Depends(get_session),
+) -> schemas.VerifiedProfileOut:
+    candidate = (
+        db.query(models.Candidate)
+        .filter(models.Candidate.auth_user_id == user.auth_user_id)
+        .first()
+    )
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+    profile = (
+        db.query(models.VerifiedProfile)
+        .filter(models.VerifiedProfile.candidate_id == candidate.id)
+        .first()
+    )
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No verified profile yet. Run POST /me/profile/extract first.",
+        )
+    return _to_verified_out(profile)
+
+
+@router.patch(
+    "/me/profile",
+    response_model=schemas.VerifiedProfileOut,
+    summary="Edit verified-profile fields (skills/education/experience).",
+)
+def patch_my_profile(
+    payload: schemas.VerifiedProfilePatchIn,
+    user: CurrentUser = Depends(require_candidate),
+    db: Session = Depends(get_session),
+) -> schemas.VerifiedProfileOut:
+    """Apply candidate corrections to their extracted profile.
+
+    Edited field names are added to ``edited_fields`` so subsequent
+    re-extractions don't clobber the corrections.
+    """
+    candidate = (
+        db.query(models.Candidate)
+        .filter(models.Candidate.auth_user_id == user.auth_user_id)
+        .first()
+    )
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+
+    profile = (
+        db.query(models.VerifiedProfile)
+        .filter(models.VerifiedProfile.candidate_id == candidate.id)
+        .first()
+    )
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No verified profile yet. Run POST /me/profile/extract first.",
+        )
+
+    edited = set(profile.edited_fields or [])
+    for field_name in ("experience", "education", "skills"):
+        value = getattr(payload, field_name)
+        if value is not None:
+            setattr(profile, field_name, value)
+            edited.add(field_name)
+    profile.edited_fields = sorted(edited)
+    profile.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(profile)
+    return _to_verified_out(profile)
+
+
+# Manager-side view of any candidate's verified profile.
+@router.get(
+    "/{candidate_id}/profile",
+    response_model=schemas.VerifiedProfileOut,
+    summary="Manager: read a candidate's extracted verified profile.",
+)
+def get_candidate_profile(
+    candidate_id: str,
+    _user: CurrentUser = Depends(require_manager),
+    db: Session = Depends(get_session),
+) -> schemas.VerifiedProfileOut:
+    profile = (
+        db.query(models.VerifiedProfile)
+        .filter(models.VerifiedProfile.candidate_id == candidate_id)
+        .first()
+    )
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No verified profile for this candidate.")
+    return _to_verified_out(profile)
+
+
 @router.post(
     "/me/profile/extract",
     response_model=schemas.VerifiedProfileOut,
