@@ -125,6 +125,7 @@ Architectural refinement after #2a–c shipped. Splits company-level config into
   - Remove the deprecated back-compat `Company.__init__` legacy-kwargs absorber.
   - Remove the deprecated `@property` pass-throughs (`company.tagline`, `company.artifact_values`, `company.knowledge_graph`, `company.teammates`, `company.scenarios`). Update all call sites to reference `position.team.X` / `position.organization.X` explicitly.
   - Drop the temporary `_StubCompany.team_id` test scaffolding once tests use real model fixtures.
+  - **Fix Match status semantics**: `simulation_matcher` currently marks a Match `succeeded` even when every rollout failed and no `RolloutScore` rows exist. Should require ≥1 scored rollout to call it succeeded; otherwise mark `failed` with the captured rollout error. Today this hides upstream bugs and forces a manual re-seed to recover.
 
 ### Why #2d.4 is staged separately
 
@@ -245,11 +246,35 @@ Closes the persona-accuracy feedback loop and powers the profile-accuracy ring f
 
 ---
 
-## PR #6 — Bias / fairness audit panel (#4 on demo list)
+## PR #6 — Reliability + Fairness audit panel (#4 on demo list)
 
-Recruiter-only, behind a settings toggle initially.
+Recruiter-only, behind a settings toggle initially. Scope expanded from
+the original "bias panel" because reliability calibration is the same UI
+surface (admin-only analytical views over leaderboard data) and shares
+the queries that already exist on `/admin/sim-health`.
 
-### Scope
+### Scope — Reliability (calibration view)
+
+The data is already in `rollout_scores` + `rollouts.final_state` +
+`/admin/sim-health` (PR #1). This PR adds the UI.
+
+- **Baseline–simulation correlation** across all candidates for the
+  selected company: scatterplot (baseline_score, sim_score), Pearson
+  coefficient, regression line. Healthy band 0.4–0.7 highlighted.
+- **|Δ| distribution**: histogram of `|sim_score − baseline_score|`.
+  Quick read of how often simulation diverges from the baseline.
+- **Per-criterion judge agreement** distribution. Flag criteria where
+  agreement < 0.65 (rubric ambiguity warning).
+- **σ across rollouts** distribution. Flag scenarios with σ > ~12
+  (prompt looseness or genuine candidate ambivalence).
+- **Persona fidelity stats** per company: mean fidelity, distribution,
+  retry rate. Both internal QA and an investor-facing trust metric —
+  *"we measure that our agents stay in character; here's the number."*
+- **Prompt-version split**: same metrics grouped by `prompt_version`,
+  so we can see whether the latest prompt scaffolding is improving or
+  regressing fidelity vs. baseline-correlation.
+
+### Scope — Fairness (original PR #6)
 
 - Score distributions across self-reported demographics.
 - Statistical parity gap highlights.
@@ -258,8 +283,10 @@ Recruiter-only, behind a settings toggle initially.
 
 ### Acceptance
 
-- Recruiter can toggle audit panel on per-company.
-- Distributions render across at least: gender, age band, education tier.
+- Recruiter can open a "Reliability + Fairness" surface from Settings.
+- Reliability panel renders the five chart families above.
+- Fairness distributions render across at least: gender, age band,
+  education tier.
 - Export produces a defensible CSV/PDF report.
 
 ---

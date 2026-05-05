@@ -42,8 +42,17 @@ export default function FitProfileV3({
     inconsistencyFlags = [],
     confidenceSignals = null,
     auditTrailV2 = {},
+    // PR #2d.3 — dual scores. behaviourFit falls back to overallScore for
+    // legacy reports computed before this PR. skillsFit is null when the
+    // position has no required_skills configured.
+    behaviourFit,
+    skillsFit,
+    skillsFitDetails = null,
   } = report;
   const displayName = companyName || company_name;
+  const behaviourScore =
+    typeof behaviourFit === "number" ? behaviourFit : overallScore;
+  const skillsScore = typeof skillsFit === "number" ? skillsFit : null;
 
   const [explainKey, setExplainKey] = useState(null); // dimension key being explained
   const [verified, setVerified] = useState(null);
@@ -92,22 +101,11 @@ export default function FitProfileV3({
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
-          <div style={{ textAlign: "right" }}>
-            <div className="label-mono" style={{ marginBottom: 4 }}>Weighted fit</div>
-            <div
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 72,
-                fontWeight: 500,
-                lineHeight: 1,
-                color: COLORS.accent,
-                letterSpacing: "-0.03em",
-              }}
-            >
-              {overallScore}
-            </div>
-            <div className="label-mono">of 100</div>
-          </div>
+          <DualScoreHeadline
+            overall={overallScore}
+            behaviour={behaviourScore}
+            skills={skillsScore}
+          />
           <BaselineCompareStrip
             baselineComparison={baselineComparison}
             simulationOverallScore={overallScore}
@@ -573,6 +571,87 @@ function Metric({ label, value }) {
           fontWeight: 500,
           color: COLORS.ink,
           lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Dual-score headline — Roadmap 2 / PR #2d.3.
+// Big overall number + the two components (Skills · Behaviour) below it.
+// When skills_fit is null (no required_skills configured), shows behaviour
+// alone with a small note; the overall == behaviour in that case.
+// ===========================================================================
+function DualScoreHeadline({ overall, behaviour, skills }) {
+  return (
+    <div style={{ textAlign: "right" }}>
+      <div className="label-mono" style={{ marginBottom: 4 }}>
+        Overall fit
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 72,
+          fontWeight: 500,
+          lineHeight: 1,
+          color: COLORS.accent,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {overall}
+      </div>
+      <div className="label-mono" style={{ marginBottom: 10 }}>of 100</div>
+
+      {skills == null ? (
+        <div
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 11,
+            color: COLORS.muted,
+            letterSpacing: "0.05em",
+            maxWidth: 220,
+            textAlign: "right",
+          }}
+        >
+          behaviour-only · no required skills configured
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            gap: 14,
+            justifyContent: "flex-end",
+            alignItems: "baseline",
+          }}
+        >
+          <SubScore label="Skills" value={skills} />
+          <span style={{ color: COLORS.muted, fontFamily: FONT_MONO }}>·</span>
+          <SubScore label="Behaviour" value={behaviour} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubScore({ label, value }) {
+  return (
+    <div style={{ textAlign: "right" }}>
+      <div
+        className="label-mono"
+        style={{ fontSize: 10, marginBottom: 2 }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 26,
+          fontWeight: 500,
+          lineHeight: 1,
+          color: COLORS.ink,
         }}
       >
         {value}

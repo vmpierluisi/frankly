@@ -272,16 +272,28 @@ def _render_communication_ledger(ledger: dict) -> list[str]:
     return lines
 
 
-def _render_voice_samples(samples: list[dict]) -> list[str]:
+def _render_voice_samples(samples: list) -> list[str]:
+    """Render voice samples for the agent prompt.
+
+    Accepts heterogeneous shapes:
+      - {"text": str, "source": str}    — canonical, from extractors
+      - plain str                        — used by demo seeds and CV-only flows
+    """
     if not samples:
         return ["  (no voice samples available — fall back to neutral but plain phrasing)"]
     lines: list[str] = []
     for s in samples[:_MAX_VOICE_SAMPLES_RENDERED]:
-        text = (s.get("text") or "").strip()
+        if isinstance(s, str):
+            text = s.strip()
+            source = "?"
+        elif isinstance(s, dict):
+            text = (s.get("text") or "").strip()
+            source = s.get("source", "?")
+        else:
+            continue
         if not text:
             continue
         text = text[:_MAX_VOICE_SAMPLE_CHARS]
-        source = s.get("source", "?")
         lines.append(f"  [{source}] {text}")
     return lines or ["  (samples present but empty — use neutral plain phrasing)"]
 

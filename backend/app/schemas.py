@@ -450,6 +450,10 @@ class LeaderboardRow(BaseModel):
     github_url: str | None = None
     portfolio_url: str | None = None
     profile_accuracy_score: int = 0
+    # Roadmap 2 / PR #2d.3 — dual-score columns. None if the position has
+    # no required_skills configured (skills_fit can't be computed).
+    behaviour_fit: int | None = None
+    skills_fit: int | None = None
 
 
 class LeaderboardOut(BaseModel):

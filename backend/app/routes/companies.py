@@ -195,6 +195,11 @@ def get_leaderboard(
                 github_url=candidate.github_url,
                 portfolio_url=candidate.portfolio_url,
                 profile_accuracy_score=candidate.profile_accuracy_score or 0,
+                # Roadmap 2 / PR #2d.3 — dual scores. Legacy reports without
+                # behaviourFit fall back to overall_score (which was
+                # behaviour-only before this PR).
+                behaviour_fit=(match.report or {}).get("behaviourFit", match.overall_score),
+                skills_fit=(match.report or {}).get("skillsFit"),
             )
         )
 
