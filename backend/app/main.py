@@ -12,9 +12,9 @@ from .db import SessionLocal, init_db
 from .routes import (
     admin,
     candidates,
-    companies,
     matches,
     organizations,
+    positions,
     scenarios,
     team,
     teams,
@@ -81,7 +81,7 @@ def health() -> HealthOut:
 
 app.include_router(admin.router)
 app.include_router(candidates.router)
-app.include_router(companies.router)
+app.include_router(positions.router)
 app.include_router(templates.router)
 app.include_router(matches.router)
 app.include_router(team.router)

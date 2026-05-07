@@ -266,7 +266,7 @@ class TeamDetailOut(TeamOut):
     positions: list[PositionOut] = Field(default_factory=list)
 
 
-class CompanyIn(BaseModel):
+class PositionIn(BaseModel):
     """Position create/update payload.
 
     PR #2d: Org-level fields (tagline, artifact_values) and team-level
@@ -297,7 +297,7 @@ class CompanyIn(BaseModel):
     skill_match_weight: float | None = None
 
 
-class CompanyOut(BaseModel):
+class PositionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -319,7 +319,7 @@ class CompanyOut(BaseModel):
     updated_at: datetime
 
 
-class CompanyListItem(BaseModel):
+class PositionListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -358,7 +358,7 @@ class ExtractCriteriaOut(BaseModel):
 # ----------------------------------------------------------------------------
 class TriggerMatchIn(BaseModel):
     candidate_id: str
-    company_id: str
+    position_id: str
 
 
 class CriterionScore(BaseModel):
@@ -368,7 +368,7 @@ class CriterionScore(BaseModel):
 
 class FitReport(BaseModel):
     """The matcher's return shape, mirroring the JSX reference envelope."""
-    company_id: str
+    position_id: str
     company_name: str
     role: str
     overall_score: int
@@ -380,7 +380,7 @@ class FitReport(BaseModel):
 
 
 class SearchMatchIn(BaseModel):
-    company_id: str
+    position_id: str
     refresh: bool = False
 
 
@@ -405,7 +405,7 @@ class SearchMatchResultItem(BaseModel):
 
 
 class SearchMatchOut(BaseModel):
-    company_id: str
+    position_id: str
     company_name: str
     role: str
     pool_size: int
@@ -417,7 +417,7 @@ class MatchOut(BaseModel):
 
     id: str
     candidate_id: str
-    company_id: str
+    position_id: str
     overall_score: int
     band: str
     band_note: str
@@ -457,7 +457,7 @@ class LeaderboardRow(BaseModel):
 
 
 class LeaderboardOut(BaseModel):
-    company_id: str
+    position_id: str
     company_name: str
     role: str
     role_family: str | None = None

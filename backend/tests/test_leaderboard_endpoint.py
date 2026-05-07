@@ -39,7 +39,7 @@ def client_and_db():
     Session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     db = Session()
 
-    company = models.Company(
+    company = models.Position(
         id="test-co",
         name="Test Co",
         role="Analyst",
@@ -79,7 +79,7 @@ def client_and_db():
     now = datetime.now(timezone.utc)
     match_a = models.Match(
         candidate_id=cand_a.id,
-        company_id="test-co",
+        position_id="test-co",
         status="succeeded",
         overall_score=85,
         band="Strong fit",
@@ -89,7 +89,7 @@ def client_and_db():
     )
     match_b = models.Match(
         candidate_id=cand_b.id,
-        company_id="test-co",
+        position_id="test-co",
         status="succeeded",
         overall_score=70,
         band="Good fit",
@@ -99,7 +99,7 @@ def client_and_db():
     )
     match_c = models.Match(
         candidate_id=cand_c.id,
-        company_id="test-co",
+        position_id="test-co",
         status="pending",
         overall_score=0,
         band="",
@@ -132,17 +132,17 @@ def client_and_db():
 
 def test_leaderboard_returns_all_statuses(client_and_db):
     client, db, company, *_ = client_and_db
-    resp = client.get("/companies/test-co/leaderboard")
+    resp = client.get("/positions/test-co/leaderboard")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["company_id"] == "test-co"
+    assert data["position_id"] == "test-co"
     assert data["is_open"] is True
     assert len(data["results"]) == 3
 
 
 def test_leaderboard_succeeded_before_pending(client_and_db):
     client, db, company, cand_a, cand_b, cand_c = client_and_db
-    resp = client.get("/companies/test-co/leaderboard")
+    resp = client.get("/positions/test-co/leaderboard")
     results = resp.json()["results"]
 
     statuses = [r["status"] for r in results]
@@ -154,7 +154,7 @@ def test_leaderboard_succeeded_before_pending(client_and_db):
 
 def test_leaderboard_succeeded_ordered_by_score_desc(client_and_db):
     client, db, company, cand_a, cand_b, cand_c = client_and_db
-    resp = client.get("/companies/test-co/leaderboard")
+    resp = client.get("/positions/test-co/leaderboard")
     results = resp.json()["results"]
 
     succeeded = [r for r in results if r["status"] == "succeeded"]
@@ -164,7 +164,7 @@ def test_leaderboard_succeeded_ordered_by_score_desc(client_and_db):
 
 def test_leaderboard_404_for_unknown_company(client_and_db):
     client, *_ = client_and_db
-    resp = client.get("/companies/does-not-exist/leaderboard")
+    resp = client.get("/positions/does-not-exist/leaderboard")
     assert resp.status_code == 404
 
 
@@ -173,7 +173,7 @@ def test_leaderboard_requires_manager_auth():
     engine = _make_engine()
     Session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     db = Session()
-    company = models.Company(
+    company = models.Position(
         id="auth-test-co", name="Auth Test", role="Analyst",
         role_family="financial_analyst", target_seniority="mid", is_open=True,
     )
@@ -190,7 +190,7 @@ def test_leaderboard_requires_manager_auth():
     # Do NOT override require_manager — let real auth run.
 
     with TestClient(fastapi_app, raise_server_exceptions=False) as c:
-        resp = c.get("/companies/auth-test-co/leaderboard")
+        resp = c.get("/positions/auth-test-co/leaderboard")
 
     fastapi_app.dependency_overrides.clear()
     db.close()

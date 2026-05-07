@@ -54,7 +54,7 @@ def _seed_match(db) -> Match:
     m = Match(
         id="match-001",
         candidate_id="cand-001",
-        company_id="co-001",
+        position_id="co-001",
         overall_score=78,
         band="Strong fit",
         band_note="Worth a call.",
@@ -184,7 +184,7 @@ def test_get_rollout_404_on_unknown(client, db_session):
 
 def test_get_rollout_404_on_wrong_match(client, db_session):
     _seed_match(db_session)
-    m2 = Match(id="match-002", candidate_id="c", company_id="co", overall_score=0, band="", band_note="", report={})
+    m2 = Match(id="match-002", candidate_id="c", position_id="co", overall_score=0, band="", band_note="", report={})
     db_session.add(m2)
     db_session.flush()
     r = _seed_rollout(db_session, match_id="match-002")

@@ -281,7 +281,7 @@ def get_match_logs(
 
 @router.get("/sim-health", dependencies=[Depends(_require_admin)])
 def sim_health(
-    company_id: str | None = None,
+    position_id: str | None = None,
     prompt_version: str | None = None,
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
@@ -289,7 +289,7 @@ def sim_health(
 
     Query parameters
     ----------------
-    company_id : optional — filter to a single vacancy.
+    position_id : optional — filter to a single vacancy.
     prompt_version : optional — filter to a single prompt version.
 
     Response shape
@@ -299,17 +299,17 @@ def sim_health(
       "totals": { "matches", "rollouts", "rollouts_superseded", ... },
       "fidelity": { "n", "mean", "low_count", "low_rate", "violation_kinds": {...} },
       "criteria_judge_confidence": { "n", "mean" },
-      "by_company": [ { company_id, ..., metrics }, ... ],
+      "by_company": [ { position_id, ..., metrics }, ... ],
       "by_prompt_version": [ { prompt_version, ..., metrics }, ... ]
     }
     """
     from collections import Counter
 
     rollout_q = select(models.Rollout)
-    if company_id is not None:
+    if position_id is not None:
         rollout_q = rollout_q.join(
             models.Match, models.Match.id == models.Rollout.match_id,
-        ).where(models.Match.company_id == company_id)
+        ).where(models.Match.position_id == position_id)
     if prompt_version is not None:
         rollout_q = rollout_q.where(models.Rollout.prompt_version == prompt_version)
     rollouts = db.execute(rollout_q).scalars().all()
@@ -377,7 +377,7 @@ def sim_health(
     if rollouts:
         match_company = dict(
             db.execute(
-                select(models.Match.id, models.Match.company_id).where(
+                select(models.Match.id, models.Match.position_id).where(
                     models.Match.id.in_(match_ids)
                 )
             ).all()
@@ -389,7 +389,7 @@ def sim_health(
         for r in rollouts:
             cid = match_company.get(r.match_id, "unknown")
             bucket = by_company.setdefault(cid, {
-                "company_id": cid,
+                "position_id": cid,
                 "rollouts": 0,
                 "superseded": 0,
                 "fidelity_n": 0,
@@ -410,7 +410,7 @@ def sim_health(
     for c in by_company.values():
         n = c["fidelity_n"]
         company_rows.append({
-            "company_id": c["company_id"],
+            "position_id": c["position_id"],
             "rollouts": c["rollouts"],
             "superseded": c["superseded"],
             "fidelity_n": n,
@@ -462,7 +462,7 @@ def sim_health(
     pv_rows.sort(key=lambda x: x["prompt_version"])
 
     return {
-        "filters": {"company_id": company_id, "prompt_version": prompt_version},
+        "filters": {"position_id": position_id, "prompt_version": prompt_version},
         "totals": totals,
         "fidelity": fidelity_block,
         "criteria_judge_confidence": criteria_block,

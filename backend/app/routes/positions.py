@@ -13,7 +13,7 @@ from ..auth import require_manager
 from ..db import get_session
 
 router = APIRouter(
-    prefix="/companies",
+    prefix="/positions",
     tags=["companies"],
     dependencies=[Depends(require_manager)],
 )
@@ -21,22 +21,22 @@ router = APIRouter(
 
 # Public list used by candidate-side intake has a separate endpoint below —
 # carved out via inclusion order in main.py.
-@router.get("", response_model=list[schemas.CompanyListItem])
-def list_companies(db: Session = Depends(get_session)) -> list[schemas.CompanyListItem]:
-    rows = db.query(models.Company).order_by(models.Company.name).all()
-    return [schemas.CompanyListItem.model_validate(c) for c in rows]
+@router.get("", response_model=list[schemas.PositionListItem])
+def list_companies(db: Session = Depends(get_session)) -> list[schemas.PositionListItem]:
+    rows = db.query(models.Position).order_by(models.Position.name).all()
+    return [schemas.PositionListItem.model_validate(c) for c in rows]
 
 
-@router.post("", response_model=schemas.CompanyOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.PositionOut, status_code=status.HTTP_201_CREATED)
 def create_company(
-    payload: schemas.CompanyIn,
+    payload: schemas.PositionIn,
     db: Session = Depends(get_session),
-) -> schemas.CompanyOut:
-    company_id = payload.id or _slugify(payload.name)
-    if db.get(models.Company, company_id) is not None:
+) -> schemas.PositionOut:
+    position_id = payload.id or _slugify(payload.name)
+    if db.get(models.Position, position_id) is not None:
         raise HTTPException(
             status_code=409,
-            detail=f"Company id '{company_id}' already exists.",
+            detail=f"Company id '{position_id}' already exists.",
         )
 
     # Build the Company under an Organization → Team. If ``team_id`` is
@@ -47,7 +47,7 @@ def create_company(
     # that absorbed those kwargs; PR #2d.4.b moves the absorption out of the
     # model and into this single call site so the model stays clean.
     company_kwargs: dict = dict(
-        id=company_id,
+        id=position_id,
         name=payload.name,
         role=payload.role,
         role_family=payload.role_family,
@@ -83,7 +83,7 @@ def create_company(
         db.flush()  # populate org.id / team.id for the FK assignment below
         company_kwargs["organization_id"] = org.id
         company_kwargs["team_id"] = team.id
-    company = models.Company(**company_kwargs)
+    company = models.Position(**company_kwargs)
     for i, crit in enumerate(payload.criteria):
         company.criteria.append(
             models.Criterion(
@@ -97,27 +97,27 @@ def create_company(
     db.add(company)
     db.commit()
     db.refresh(company)
-    return schemas.CompanyOut.model_validate(company)
+    return schemas.PositionOut.model_validate(company)
 
 
-@router.get("/{company_id}", response_model=schemas.CompanyOut)
+@router.get("/{position_id}", response_model=schemas.PositionOut)
 def get_company(
-    company_id: str,
+    position_id: str,
     db: Session = Depends(get_session),
-) -> schemas.CompanyOut:
-    company = db.get(models.Company, company_id)
+) -> schemas.PositionOut:
+    company = db.get(models.Position, position_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    return schemas.CompanyOut.model_validate(company)
+    return schemas.PositionOut.model_validate(company)
 
 
-@router.put("/{company_id}", response_model=schemas.CompanyOut)
+@router.put("/{position_id}", response_model=schemas.PositionOut)
 def update_company(
-    company_id: str,
-    payload: schemas.CompanyIn,
+    position_id: str,
+    payload: schemas.PositionIn,
     db: Session = Depends(get_session),
-) -> schemas.CompanyOut:
-    company = db.get(models.Company, company_id)
+) -> schemas.PositionOut:
+    company = db.get(models.Position, position_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
@@ -147,15 +147,15 @@ def update_company(
         )
     db.commit()
     db.refresh(company)
-    return schemas.CompanyOut.model_validate(company)
+    return schemas.PositionOut.model_validate(company)
 
 
-@router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_company(
-    company_id: str,
+    position_id: str,
     db: Session = Depends(get_session),
 ) -> None:
-    company = db.get(models.Company, company_id)
+    company = db.get(models.Position, position_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
     db.delete(company)
@@ -163,23 +163,23 @@ def delete_company(
 
 
 # ---------------------------------------------------------------------------
-# GET /companies/{company_id}/leaderboard
+# GET /companies/{position_id}/leaderboard
 # ---------------------------------------------------------------------------
 
-@router.get("/{company_id}/leaderboard", response_model=schemas.LeaderboardOut)
+@router.get("/{position_id}/leaderboard", response_model=schemas.LeaderboardOut)
 def get_leaderboard(
-    company_id: str,
+    position_id: str,
     db: Session = Depends(get_session),
 ) -> schemas.LeaderboardOut:
     """Return all Match rows for a company ordered by status then overall_score."""
-    company = db.get(models.Company, company_id)
+    company = db.get(models.Position, position_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
     matches = db.execute(
         select(models.Match, models.Candidate)
         .join(models.Candidate, models.Match.candidate_id == models.Candidate.id)
-        .where(models.Match.company_id == company_id)
+        .where(models.Match.position_id == position_id)
         .order_by(
             # succeeded rows first, then by score descending, then by finish time
             (models.Match.status != "succeeded").asc(),
@@ -217,7 +217,7 @@ def get_leaderboard(
         )
 
     return schemas.LeaderboardOut(
-        company_id=company.id,
+        position_id=company.id,
         company_name=company.name,
         role=company.role,
         role_family=company.role_family,

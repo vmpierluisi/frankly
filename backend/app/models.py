@@ -157,12 +157,8 @@ class VerifiedProfile(Base):
 #   Team          → owns the people + scenarios the simulation uses
 #                   (synthetic teammates, scenarios, team_structure,
 #                   sample_comms, knowledge_graph).
-#   Company (Position internally) → owns role-specific config
-#                   (role title, role_family, seniority, criteria,
-#                   required_skills, role_spec).
-#
-# Note: the table is still named ``companies`` and the class still ``Company``
-# to keep the diff small. UI surfaces this entity as "Position" everywhere.
+#   Position      → owns role-specific config (role title, role_family,
+#                   seniority, criteria, required_skills, role_spec).
 # ----------------------------------------------------------------------------
 class Organization(Base):
     __tablename__ = "organizations"
@@ -207,11 +203,11 @@ class Team(Base):
     organization: Mapped[Organization] = relationship(
         "Organization", back_populates="teams"
     )
-    positions: Mapped[list["Company"]] = relationship(
-        "Company",
+    positions: Mapped[list["Position"]] = relationship(
+        "Position",
         back_populates="team",
         cascade="all, delete-orphan",
-        order_by="Company.created_at",
+        order_by="Position.created_at",
     )
     teammates: Mapped[list["SyntheticTeammate"]] = relationship(
         "SyntheticTeammate",
@@ -227,21 +223,13 @@ class Team(Base):
     )
 
 
-class Company(Base):
-    """⚠️ NAMING DEBT: this class is a *Position*, not a company.
+class Position(Base):
+    """A single vacancy under a Team under an Organization.
 
-    Kept the legacy name (``Company`` / ``companies`` table) to bound the
-    blast radius of the PR #2d schema split. Conceptually:
-
-        Organization → Team → Company (= Position / vacancy)
-
-    Owns role-specific config only — culture/team-structure/teammates
+    Owns role-specific config only — culture / team-structure / teammates
     bubble up via ``self.team`` and ``self.team.organization``.
-
-    Cleanup: ROADMAP_2 PR #2d.4 renames the class + table to ``Position``
-    once dual-score (#2d.3) is validated through real usage.
     """
-    __tablename__ = "companies"
+    __tablename__ = "positions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     organization_id: Mapped[str] = mapped_column(
@@ -287,12 +275,12 @@ class Company(Base):
     team: Mapped[Team] = relationship("Team", back_populates="positions")
     criteria: Mapped[list["Criterion"]] = relationship(
         "Criterion",
-        back_populates="company",
+        back_populates="position",
         cascade="all, delete-orphan",
         order_by="Criterion.ordering",
     )
     matches: Mapped[list["Match"]] = relationship(
-        "Match", back_populates="company", cascade="all, delete-orphan"
+        "Match", back_populates="position", cascade="all, delete-orphan"
     )
 
     def __init__(self, **kwargs):
@@ -323,8 +311,8 @@ class Criterion(Base):
     __tablename__ = "criteria"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    position_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("positions.id", ondelete="CASCADE"), index=True
     )
 
     # camelCase key used in scoring/signals aggregation (e.g. "analyticalRigor").
@@ -335,7 +323,7 @@ class Criterion(Base):
     weight: Mapped[float] = mapped_column(Float, default=0.0)
     ordering: Mapped[int] = mapped_column(Integer, default=0)
 
-    company: Mapped[Company] = relationship("Company", back_populates="criteria")
+    position: Mapped[Position] = relationship("Position", back_populates="criteria")
 
 
 # ----------------------------------------------------------------------------
@@ -348,10 +336,8 @@ class Match(Base):
     candidate_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("candidates.id", ondelete="CASCADE"), index=True
     )
-    # ⚠️ NAMING DEBT: this references a Position (see Company class note).
-    # Renames to ``position_id`` in ROADMAP_2 PR #2d.4.
-    company_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    position_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("positions.id", ondelete="CASCADE"), index=True
     )
 
     overall_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -378,7 +364,7 @@ class Match(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     candidate: Mapped[Candidate] = relationship("Candidate", back_populates="matches")
-    company: Mapped[Company] = relationship("Company", back_populates="matches")
+    position: Mapped[Position] = relationship("Position", back_populates="matches")
 
 
 # ----------------------------------------------------------------------------

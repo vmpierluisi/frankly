@@ -453,8 +453,8 @@ COMPANY_REQUIRED_SKILLS = {
 
 
 def _set_required_skills(db) -> None:
-    for company_id, skills in COMPANY_REQUIRED_SKILLS.items():
-        company = db.get(models.Company, company_id)
+    for position_id, skills in COMPANY_REQUIRED_SKILLS.items():
+        company = db.get(models.Position, position_id)
         if company is None:
             continue
         company.required_skills = skills

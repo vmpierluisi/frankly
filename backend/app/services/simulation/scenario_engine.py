@@ -159,7 +159,7 @@ class WorldState:
 
 def validate_scoring_dims(
     scoring_dims: list[str],
-    company: "Company",
+    company: "Position",
 ) -> list[str]:
     """Return list of scoring_dims keys that do NOT match any company criterion."""
     valid_keys = {c.key for c in getattr(company, "criteria", [])}
@@ -170,7 +170,7 @@ def validate_scoring_dims(
 # Prompt rendering helpers
 # ---------------------------------------------------------------------------
 
-def _render_drafter_user_prompt(company: "Company") -> str:
+def _render_drafter_user_prompt(company: "Position") -> str:
     org = getattr(company, "organization", None)
     team = getattr(company, "team", None)
     return SCENARIO_DRAFTER_USER_TEMPLATE.format(
@@ -192,7 +192,7 @@ def _render_drafter_user_prompt(company: "Company") -> str:
 # ---------------------------------------------------------------------------
 
 async def draft_scenarios(
-    company: "Company",
+    company: "Position",
     *,
     budget: CostBudget,
 ) -> "list[MomentOfTruth]":

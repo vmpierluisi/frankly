@@ -188,7 +188,7 @@ def validate_graph(graph: dict[str, Any]) -> list[str]:
 # Prompt rendering
 # ---------------------------------------------------------------------------
 
-def _render_user_prompt(company: "Company") -> str:
+def _render_user_prompt(company: "Position") -> str:
     org = getattr(company, "organization", None)
     team = getattr(company, "team", None)
     return KNOWLEDGE_GRAPH_USER_TEMPLATE.format(
@@ -205,7 +205,7 @@ def _render_user_prompt(company: "Company") -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
-async def extract(company: "Company", *, budget: CostBudget) -> dict[str, Any]:
+async def extract(company: "Position", *, budget: CostBudget) -> dict[str, Any]:
     """Extract a knowledge graph from company artifacts.
 
     Returns the KnowledgeGraph dict (nodes + edges). Does not persist to DB —

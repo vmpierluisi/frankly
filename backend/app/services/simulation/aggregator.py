@@ -39,7 +39,7 @@ def aggregate_fit_profile(
     criteria: list[dict[str, Any]],
     *,
     match_id: str = "",
-    company_id: str = "",
+    position_id: str = "",
     company_name: str = "",
     role: str = "",
     baseline_report: dict[str, Any] | None = None,
@@ -236,7 +236,7 @@ def aggregate_fit_profile(
     profile: dict[str, Any] = {
         # Legacy fields
         "matchId": match_id,
-        "companyId": company_id,
+        "companyId": position_id,
         "companyName": company_name,
         "role": role,
         "overallScore": overall,

@@ -176,7 +176,7 @@ TEAM_CENTROID_SCHEMA: dict[str, Any] = {
 # Prompt rendering helpers
 # ---------------------------------------------------------------------------
 
-def _render_criteria_block(company: "Company") -> str:
+def _render_criteria_block(company: "Position") -> str:
     criteria = getattr(company, "criteria", []) or []
     if not criteria:
         return "  (no criteria defined)"
@@ -186,7 +186,7 @@ def _render_criteria_block(company: "Company") -> str:
     )
 
 
-def _render_centroid_user_prompt(company: "Company") -> str:
+def _render_centroid_user_prompt(company: "Position") -> str:
     org = getattr(company, "organization", None)
     team = getattr(company, "team", None)
     return TEAM_CENTROID_USER_TEMPLATE.format(
@@ -208,7 +208,7 @@ def _render_centroid_user_prompt(company: "Company") -> str:
 # Phase 2A public API
 # ---------------------------------------------------------------------------
 
-async def extract_centroid(company: "Company", *, budget: CostBudget) -> dict[str, Any]:
+async def extract_centroid(company: "Position", *, budget: CostBudget) -> dict[str, Any]:
     """Extract the team centroid trait sheet from company artifacts.
 
     Returns the TeamCentroid dict. Does not persist to DB — caller decides
@@ -388,7 +388,7 @@ def _render_centroid_tensions_block(centroid: dict[str, Any]) -> str:
     )
 
 
-def _render_artifact_excerpts(company: "Company") -> str:
+def _render_artifact_excerpts(company: "Position") -> str:
     org = getattr(company, "organization", None)
     team = getattr(company, "team", None)
     parts: list[str] = []
@@ -407,7 +407,7 @@ def _render_artifact_excerpts(company: "Company") -> str:
 
 
 async def _generate_one_teammate(
-    company: "Company",
+    company: "Position",
     centroid: dict[str, Any],
     sampled_sheet: dict[str, Any],
     *,
@@ -443,7 +443,7 @@ DEFAULT_TEAM_SIZE = 5
 
 
 async def synthesize(
-    company: "Company",
+    company: "Position",
     *,
     budget: CostBudget,
     n: int = DEFAULT_TEAM_SIZE,

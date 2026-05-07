@@ -62,10 +62,10 @@ def db():
         engine.dispose()
 
 
-def _make_company(db, company_id, role_family, target_seniority, is_open=True):
-    c = models.Company(
-        id=company_id,
-        name=company_id,
+def _make_company(db, position_id, role_family, target_seniority, is_open=True):
+    c = models.Position(
+        id=position_id,
+        name=position_id,
         role="Analyst",
         role_family=role_family,
         target_seniority=target_seniority,
@@ -152,7 +152,7 @@ def test_enqueue_skips_succeeded_match(db):
     candidate = _make_candidate(db, "financial_analyst", "mid")
     existing = models.Match(
         candidate_id=candidate.id,
-        company_id=company.id,
+        position_id=company.id,
         status="succeeded",
         overall_score=75,
         band="Strong fit",
@@ -171,7 +171,7 @@ def test_enqueue_resets_failed_match(db):
     candidate = _make_candidate(db, "financial_analyst", "mid")
     existing = models.Match(
         candidate_id=candidate.id,
-        company_id=company.id,
+        position_id=company.id,
         status="failed",
         overall_score=0,
         band="",
@@ -193,7 +193,7 @@ def test_enqueue_skips_running_match(db):
     candidate = _make_candidate(db, "financial_analyst", "mid")
     existing = models.Match(
         candidate_id=candidate.id,
-        company_id=company.id,
+        position_id=company.id,
         status="running",
         overall_score=0,
         band="",

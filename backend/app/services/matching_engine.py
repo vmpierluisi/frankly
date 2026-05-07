@@ -17,7 +17,7 @@ from ..lib.role_families import compatible_seniorities
 def find_open_companies_for_candidate(
     db: Session,
     candidate: models.Candidate,
-) -> list[models.Company]:
+) -> list[models.Position]:
     """Return open companies whose role family and seniority are compatible."""
     if not candidate.target_role_family or not candidate.target_seniority:
         return []
@@ -28,10 +28,10 @@ def find_open_companies_for_candidate(
 
     return list(
         db.execute(
-            select(models.Company).where(
-                models.Company.is_open == True,  # noqa: E712
-                models.Company.role_family == candidate.target_role_family,
-                models.Company.target_seniority.in_(compat),
+            select(models.Position).where(
+                models.Position.is_open == True,  # noqa: E712
+                models.Position.role_family == candidate.target_role_family,
+                models.Position.target_seniority.in_(compat),
             )
         ).scalars().all()
     )
@@ -57,14 +57,14 @@ def enqueue_matches_for_candidate(
         existing = db.execute(
             select(models.Match).where(
                 models.Match.candidate_id == candidate.id,
-                models.Match.company_id == company.id,
+                models.Match.position_id == company.id,
             )
         ).scalar_one_or_none()
 
         if existing is None:
             match = models.Match(
                 candidate_id=candidate.id,
-                company_id=company.id,
+                position_id=company.id,
                 status="pending",
                 overall_score=0,
                 band="",

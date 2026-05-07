@@ -82,7 +82,7 @@ def client(db_session):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _seed_company(db_session) -> models.Company:
+def _seed_company(db_session) -> models.Position:
     org = models.Organization(name="Test Co", mission="We value rigor.")
     db_session.add(org)
     team = models.Team(
@@ -93,7 +93,7 @@ def _seed_company(db_session) -> models.Company:
     )
     db_session.add(team)
     db_session.flush()
-    company = models.Company(
+    company = models.Position(
         id="test-co",
         organization_id=org.id,
         team_id=team.id,
@@ -167,14 +167,14 @@ def _make_synthesize_mock(centroid, n=5):
 def test_list_team_empty(client, db_session):
     """(1) GET returns [] when no teammates exist."""
     _seed_company(db_session)
-    resp = client.get("/companies/test-co/team")
+    resp = client.get("/positions/test-co/team")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
 def test_list_team_404_unknown_company(client, db_session):
     """(6) Returns 404 for unknown company."""
-    resp = client.get("/companies/no-such-co/team")
+    resp = client.get("/positions/no-such-co/team")
     assert resp.status_code == 404
 
 
@@ -187,7 +187,7 @@ def test_synthesize_creates_teammates(client, db_session):
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        resp = client.post("/companies/test-co/team/synthesize")
+        resp = client.post("/positions/test-co/team/synthesize")
 
     assert resp.status_code == 201
     data = resp.json()
@@ -200,7 +200,7 @@ def test_synthesize_creates_teammates(client, db_session):
 
 def test_synthesize_404_unknown_company(client, db_session):
     """(6) POST /synthesize returns 404 for unknown company."""
-    resp = client.post("/companies/no-such-co/team/synthesize")
+    resp = client.post("/positions/no-such-co/team/synthesize")
     assert resp.status_code == 404
 
 
@@ -213,12 +213,12 @@ def test_patch_teammate_updates_fields(client, db_session):
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        syn = client.post("/companies/test-co/team/synthesize")
+        syn = client.post("/positions/test-co/team/synthesize")
 
     teammate_id = syn.json()[0]["id"]
 
     resp = client.patch(
-        f"/companies/test-co/team/{teammate_id}",
+        f"/positions/test-co/team/{teammate_id}",
         json={"name": "Edited Name", "seniority": "lead"},
     )
     assert resp.status_code == 200
@@ -237,20 +237,20 @@ def test_patch_teammate_404_wrong_company(client, db_session):
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        syn = client.post("/companies/test-co/team/synthesize")
+        syn = client.post("/positions/test-co/team/synthesize")
 
     teammate_id = syn.json()[0]["id"]
 
     # Create second company without teammates (auto-creates Org + Team via
     # Company.__init__ since none was supplied).
-    db_session.add(models.Company(
+    db_session.add(models.Position(
         id="other-co", name="Other Co", role="Analyst",
         artifact_role_spec="",
     ))
     db_session.commit()
 
     resp = client.patch(
-        f"/companies/other-co/team/{teammate_id}",
+        f"/positions/other-co/team/{teammate_id}",
         json={"name": "Hijack"},
     )
     assert resp.status_code == 404
@@ -265,16 +265,16 @@ def test_delete_teammate(client, db_session):
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        syn = client.post("/companies/test-co/team/synthesize")
+        syn = client.post("/positions/test-co/team/synthesize")
 
     teammates = syn.json()
     assert len(teammates) == 5
     tid = teammates[0]["id"]
 
-    resp = client.delete(f"/companies/test-co/team/{tid}")
+    resp = client.delete(f"/positions/test-co/team/{tid}")
     assert resp.status_code == 204
 
-    remaining = client.get("/companies/test-co/team").json()
+    remaining = client.get("/positions/test-co/team").json()
     assert len(remaining) == 4
     assert all(t["id"] != tid for t in remaining)
 
@@ -288,16 +288,16 @@ def test_synthesize_preserves_edited_teammates(client, db_session):
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        syn = client.post("/companies/test-co/team/synthesize")
+        syn = client.post("/positions/test-co/team/synthesize")
 
     tid = syn.json()[0]["id"]
-    client.patch(f"/companies/test-co/team/{tid}", json={"name": "Keeper"})
+    client.patch(f"/positions/test-co/team/{tid}", json={"name": "Keeper"})
 
     with patch(
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=_make_synthesize_mock(centroid),
     ):
-        resp = client.post("/companies/test-co/team/synthesize")
+        resp = client.post("/positions/test-co/team/synthesize")
 
     ids = [t["id"] for t in resp.json()]
     assert tid in ids

@@ -123,7 +123,7 @@ def _candidate_label(candidate: "Candidate") -> str:
 # Company data helpers
 # ---------------------------------------------------------------------------
 
-def _teammates_as_dicts(company: "Company") -> list[dict[str, Any]]:
+def _teammates_as_dicts(company: "Position") -> list[dict[str, Any]]:
     team = getattr(company, "team", None)
     teammates = (team.teammates if team is not None else None) or []
     return [
@@ -140,7 +140,7 @@ def _teammates_as_dicts(company: "Company") -> list[dict[str, Any]]:
     ]
 
 
-def _criteria_as_dicts(company: "Company") -> list[dict[str, Any]]:
+def _criteria_as_dicts(company: "Position") -> list[dict[str, Any]]:
     return [
         {
             "key": c.key,
@@ -152,7 +152,7 @@ def _criteria_as_dicts(company: "Company") -> list[dict[str, Any]]:
     ]
 
 
-def _company_as_dict(company: "Company") -> dict[str, Any]:
+def _company_as_dict(company: "Position") -> dict[str, Any]:
     org = getattr(company, "organization", None)
     team = getattr(company, "team", None)
     return {
@@ -176,7 +176,7 @@ async def run_match(
     *,
     match_id: str,
     candidate: "Candidate",
-    company: "Company",
+    company: "Position",
     db: "Session",
     k_per_scenario: int = _DEFAULT_K,
 ) -> dict[str, Any]:
@@ -199,7 +199,7 @@ async def run_match(
         match_id, None, "match_started",
         {
             "candidate_id": candidate.id,
-            "company_id": company.id,
+            "position_id": company.id,
             "k_per_scenario": k_per_scenario,
         },
         db=db,
@@ -425,7 +425,7 @@ async def run_match(
         list(all_scores),
         criteria,
         match_id=match_id,
-        company_id=company.id,
+        position_id=company.id,
         company_name=company.name,
         role=company.role,
         baseline_report=baseline_report,

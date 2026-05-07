@@ -41,7 +41,7 @@ async def _run_match_background(match_id: str) -> None:
             return
 
         candidate = db.get(models.Candidate, match.candidate_id)
-        company = db.get(models.Company, match.company_id)
+        company = db.get(models.Position, match.position_id)
 
         if candidate is None or company is None:
             logger.error("background_runner: missing candidate/company for match %s", match_id)
@@ -55,7 +55,7 @@ async def _run_match_background(match_id: str) -> None:
     with SessionLocal() as db:
         match = db.get(models.Match, match_id)
         candidate = db.get(models.Candidate, match.candidate_id)
-        company = db.get(models.Company, match.company_id)
+        company = db.get(models.Position, match.position_id)
 
         try:
             from ...config import settings

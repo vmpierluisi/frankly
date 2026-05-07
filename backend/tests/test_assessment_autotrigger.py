@@ -40,7 +40,7 @@ def client_and_db():
     db = Session()
 
     # Seed a matching company
-    company = models.Company(
+    company = models.Position(
         id="test-meridian",
         name="Test Meridian",
         role="Analyst",
@@ -51,7 +51,7 @@ def client_and_db():
     db.add(company)
 
     # Seed a non-matching company (wrong role family)
-    wrong_co = models.Company(
+    wrong_co = models.Position(
         id="test-eng",
         name="Test Eng",
         role="Engineer",
@@ -62,7 +62,7 @@ def client_and_db():
     db.add(wrong_co)
 
     # Seed a closed company (same role family, should be excluded)
-    closed_co = models.Company(
+    closed_co = models.Position(
         id="test-closed",
         name="Test Closed",
         role="Analyst",
@@ -120,7 +120,7 @@ def test_submit_assessment_creates_pending_match(client_and_db):
     # mid candidate + mid company → compatible. wrong_co (software_engineer) → excluded.
     # closed company → excluded.
     assert len(matches) == 1
-    assert matches[0].company_id == "test-meridian"
+    assert matches[0].position_id == "test-meridian"
     assert matches[0].status == "pending"
 
     # background_runner.schedule should have been called once

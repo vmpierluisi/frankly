@@ -243,7 +243,7 @@ def seed_companies(db: Session) -> None:
     import uuid
 
     for spec in SEED_COMPANIES:
-        existing = db.get(models.Company, spec["id"])
+        existing = db.get(models.Position, spec["id"])
         if existing is not None:
             continue
 
@@ -265,7 +265,7 @@ def seed_companies(db: Session) -> None:
         )
         db.add(team)
 
-        company = models.Company(
+        company = models.Position(
             id=spec["id"],
             organization_id=org.id,
             team_id=team.id,
@@ -296,8 +296,8 @@ def backfill_company_role_families(db: Session) -> None:
         "meridian-capital": {"role_family": "financial_analyst", "target_seniority": "mid", "is_open": True},
         "kestrel-growth":   {"role_family": "financial_analyst", "target_seniority": "senior", "is_open": True},
     }
-    for company_id, fields in backfill.items():
-        company = db.get(models.Company, company_id)
+    for position_id, fields in backfill.items():
+        company = db.get(models.Position, position_id)
         if company is None:
             continue
         if company.role_family is None:
@@ -315,13 +315,13 @@ async def seed_scenarios_for_seed_companies(db: Session) -> None:
     from .services.simulation import scenario_engine
     from .services.simulation.cost_tracker import CostBudget
 
-    for company_id in ("meridian-capital", "kestrel-growth"):
-        company = db.get(models.Company, company_id)
+    for position_id in ("meridian-capital", "kestrel-growth"):
+        company = db.get(models.Position, position_id)
         if company is None:
             continue
         existing = (
             db.query(models.MomentOfTruth)
-            .filter_by(company_id=company.id)
+            .filter_by(position_id=company.id)
             .count()
         )
         if existing > 0:
@@ -341,13 +341,13 @@ async def seed_teams_for_seed_companies(db: Session) -> None:
     from .services.simulation import team_synthesizer
     from .services.simulation.cost_tracker import CostBudget
 
-    for company_id in ("meridian-capital", "kestrel-growth"):
-        company = db.get(models.Company, company_id)
+    for position_id in ("meridian-capital", "kestrel-growth"):
+        company = db.get(models.Position, position_id)
         if company is None:
             continue
         existing = (
             db.query(models.SyntheticTeammate)
-            .filter_by(company_id=company.id)
+            .filter_by(position_id=company.id)
             .count()
         )
         if existing > 0:

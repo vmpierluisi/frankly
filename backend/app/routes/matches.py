@@ -36,7 +36,7 @@ def trigger_match(
     candidate = db.get(models.Candidate, payload.candidate_id)
     if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    company = db.get(models.Company, payload.company_id)
+    company = db.get(models.Position, payload.position_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
@@ -44,7 +44,7 @@ def trigger_match(
         select(models.Match)
         .where(
             models.Match.candidate_id == payload.candidate_id,
-            models.Match.company_id == payload.company_id,
+            models.Match.position_id == payload.position_id,
         )
         .order_by(models.Match.created_at.desc())
     ).scalar_one_or_none()
@@ -62,7 +62,7 @@ def trigger_match(
     else:
         match = models.Match(
             candidate_id=candidate.id,
-            company_id=company.id,
+            position_id=company.id,
             status="pending",
             overall_score=0,
             band="",
@@ -153,14 +153,14 @@ def get_baseline(
 @router.get("", response_model=list[schemas.MatchOut])
 def list_matches(
     candidate_id: str | None = None,
-    company_id: str | None = None,
+    position_id: str | None = None,
     db: Session = Depends(get_session),
 ) -> list[schemas.MatchOut]:
     q = db.query(models.Match).order_by(models.Match.created_at.desc())
     if candidate_id:
         q = q.filter(models.Match.candidate_id == candidate_id)
-    if company_id:
-        q = q.filter(models.Match.company_id == company_id)
+    if position_id:
+        q = q.filter(models.Match.position_id == position_id)
     return [schemas.MatchOut.model_validate(m) for m in q.all()]
 
 

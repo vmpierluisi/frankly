@@ -50,7 +50,7 @@ from app.services.simulation import simulation_matcher
 from app.config import settings
 
 
-def _pick_candidates(db, company: models.Company, n: int) -> list[models.Candidate]:
+def _pick_candidates(db, company: models.Position, n: int) -> list[models.Candidate]:
     """Pick N seed candidates compatible with this company's role family + seniority.
 
     Selection is deterministic: sort by id (stable across runs), then take the
@@ -65,7 +65,7 @@ def _pick_candidates(db, company: models.Company, n: int) -> list[models.Candida
         row[0]
         for row in db.execute(
             select(models.Match.candidate_id).where(
-                models.Match.company_id == company.id,
+                models.Match.position_id == company.id,
                 models.Match.status == "succeeded",
             )
         ).all()
@@ -86,14 +86,14 @@ def _pick_candidates(db, company: models.Company, n: int) -> list[models.Candida
 
 
 async def _seed_one(
-    company: models.Company,
+    company: models.Position,
     candidate: models.Candidate,
     dry_run: bool = False,
 ) -> str:
     """Run simulation for one (candidate, company) pair. Returns status string."""
     with SessionLocal() as db:
         # Refresh objects in this session.
-        company_db = db.get(models.Company, company.id)
+        company_db = db.get(models.Position, company.id)
         candidate_db = db.get(models.Candidate, candidate.id)
 
         if company_db is None or candidate_db is None:
@@ -103,7 +103,7 @@ async def _seed_one(
         existing = db.execute(
             select(models.Match).where(
                 models.Match.candidate_id == candidate_db.id,
-                models.Match.company_id == company_db.id,
+                models.Match.position_id == company_db.id,
             )
         ).scalar_one_or_none()
 
@@ -117,7 +117,7 @@ async def _seed_one(
         else:
             match = models.Match(
                 candidate_id=candidate_db.id,
-                company_id=company_db.id,
+                position_id=company_db.id,
                 status="running",
                 overall_score=0,
                 band="",
@@ -173,9 +173,9 @@ async def preseed(
     dry_run: bool,
 ) -> None:
     with SessionLocal() as db:
-        q = select(models.Company).where(models.Company.is_open == True)  # noqa: E712
+        q = select(models.Position).where(models.Position.is_open == True)  # noqa: E712
         if company_ids:
-            q = q.where(models.Company.id.in_(company_ids))
+            q = q.where(models.Position.id.in_(company_ids))
         companies = db.execute(q).scalars().all()
 
     if not companies:
@@ -188,7 +188,7 @@ async def preseed(
         print(f"  role_family={company.role_family}, target_seniority={company.target_seniority}")
 
         with SessionLocal() as db:
-            company_fresh = db.get(models.Company, company.id)
+            company_fresh = db.get(models.Position, company.id)
             candidates = _pick_candidates(db, company_fresh, per_company)
 
         if not candidates:

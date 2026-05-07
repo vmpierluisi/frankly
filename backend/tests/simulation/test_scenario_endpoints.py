@@ -78,7 +78,7 @@ def client(db_session):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _seed_company(db_session) -> models.Company:
+def _seed_company(db_session) -> models.Position:
     org = models.Organization(name="Test Co", mission="We value rigor.")
     db_session.add(org)
     team = models.Team(
@@ -89,7 +89,7 @@ def _seed_company(db_session) -> models.Company:
     )
     db_session.add(team)
     db_session.flush()
-    company = models.Company(
+    company = models.Position(
         id="test-co",
         organization_id=org.id,
         team_id=team.id,
@@ -154,14 +154,14 @@ def _mock_draft(canned):
 def test_list_scenarios_empty(client, db_session):
     """(1) GET returns [] before any scenarios exist."""
     _seed_company(db_session)
-    resp = client.get("/companies/test-co/scenarios")
+    resp = client.get("/positions/test-co/scenarios")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
 def test_list_scenarios_404_unknown_company(client, db_session):
     """(9) 404 for unknown company."""
-    resp = client.get("/companies/no-such-co/scenarios")
+    resp = client.get("/positions/no-such-co/scenarios")
     assert resp.status_code == 404
 
 
@@ -174,7 +174,7 @@ def test_draft_creates_scenarios(client, db_session):
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=_mock_draft(canned),
     ):
-        resp = client.post("/companies/test-co/scenarios/draft")
+        resp = client.post("/positions/test-co/scenarios/draft")
 
     assert resp.status_code == 201
     data = resp.json()
@@ -186,7 +186,7 @@ def test_draft_creates_scenarios(client, db_session):
 
 def test_draft_404_unknown_company(client, db_session):
     """(9) POST /draft returns 404 for unknown company."""
-    resp = client.post("/companies/no-such-co/scenarios/draft")
+    resp = client.post("/positions/no-such-co/scenarios/draft")
     assert resp.status_code == 404
 
 
@@ -204,7 +204,7 @@ def test_create_hand_authored_scenario(client, db_session):
         "max_turns": 4,
         "grounding": "Values doc: 'written rigor'.",
     }
-    resp = client.post("/companies/test-co/scenarios", json=payload)
+    resp = client.post("/positions/test-co/scenarios", json=payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data["title"] == "Custom Scenario"
@@ -226,7 +226,7 @@ def test_create_rejects_invalid_scoring_dims(client, db_session):
         "max_turns": 6,
         "grounding": "",
     }
-    resp = client.post("/companies/test-co/scenarios", json=payload)
+    resp = client.post("/positions/test-co/scenarios", json=payload)
     assert resp.status_code == 422
     assert "NONEXISTENT" in resp.json()["detail"]
 
@@ -240,11 +240,11 @@ def test_patch_scenario(client, db_session):
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=_mock_draft(canned),
     ):
-        draft = client.post("/companies/test-co/scenarios/draft")
+        draft = client.post("/positions/test-co/scenarios/draft")
 
     sid = draft.json()[0]["id"]
     resp = client.patch(
-        f"/companies/test-co/scenarios/{sid}",
+        f"/positions/test-co/scenarios/{sid}",
         json={"title": "Edited Title", "max_turns": 8},
     )
     assert resp.status_code == 200
@@ -261,11 +261,11 @@ def test_patch_rejects_invalid_scoring_dims(client, db_session):
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=_mock_draft(canned),
     ):
-        draft = client.post("/companies/test-co/scenarios/draft")
+        draft = client.post("/positions/test-co/scenarios/draft")
 
     sid = draft.json()[0]["id"]
     resp = client.patch(
-        f"/companies/test-co/scenarios/{sid}",
+        f"/positions/test-co/scenarios/{sid}",
         json={"scoring_dims": ["analyticalRigor", "BOGUS"]},
     )
     assert resp.status_code == 422
@@ -280,13 +280,13 @@ def test_delete_scenario(client, db_session):
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=_mock_draft(canned),
     ):
-        draft = client.post("/companies/test-co/scenarios/draft")
+        draft = client.post("/positions/test-co/scenarios/draft")
 
     sid = draft.json()[0]["id"]
-    resp = client.delete(f"/companies/test-co/scenarios/{sid}")
+    resp = client.delete(f"/positions/test-co/scenarios/{sid}")
     assert resp.status_code == 204
 
-    remaining = client.get("/companies/test-co/scenarios").json()
+    remaining = client.get("/positions/test-co/scenarios").json()
     assert all(s["id"] != sid for s in remaining)
 
 
@@ -295,7 +295,7 @@ def test_draft_preserves_hand_authored(client, db_session):
     _seed_company(db_session)
 
     # Create a hand-authored scenario first.
-    hand = client.post("/companies/test-co/scenarios", json={
+    hand = client.post("/positions/test-co/scenarios", json={
         "title": "Hand Authored",
         "scenario_type": "dyad",
         "prompt": "A hand-crafted scenario.",
@@ -314,7 +314,7 @@ def test_draft_preserves_hand_authored(client, db_session):
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=_mock_draft(canned),
     ):
-        resp = client.post("/companies/test-co/scenarios/draft")
+        resp = client.post("/positions/test-co/scenarios/draft")
 
     ids = [s["id"] for s in resp.json()]
     assert hand_id in ids
