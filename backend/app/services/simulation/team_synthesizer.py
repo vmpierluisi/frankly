@@ -187,17 +187,19 @@ def _render_criteria_block(company: "Company") -> str:
 
 
 def _render_centroid_user_prompt(company: "Company") -> str:
+    org = getattr(company, "organization", None)
+    team = getattr(company, "team", None)
     return TEAM_CENTROID_USER_TEMPLATE.format(
         company_name=company.name,
         role=company.role,
-        tagline=company.tagline or "(none)",
-        artifact_values=company.artifact_values or "(none provided)",
+        tagline=(org.tagline if org is not None else None) or "(none)",
+        artifact_values=(org.mission if org is not None else None) or "(none provided)",
         artifact_role_spec=company.artifact_role_spec or "(none provided)",
-        artifact_team_structure=company.artifact_team_structure or "(none provided)",
-        artifact_sample_comms=company.artifact_sample_comms or "(none provided)",
+        artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
+        artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
         criteria_block=_render_criteria_block(company),
         knowledge_graph_summary=summarize_for_prompt(
-            getattr(company, "knowledge_graph", None)
+            team.knowledge_graph if team is not None else None
         ),
     )
 
@@ -387,15 +389,20 @@ def _render_centroid_tensions_block(centroid: dict[str, Any]) -> str:
 
 
 def _render_artifact_excerpts(company: "Company") -> str:
+    org = getattr(company, "organization", None)
+    team = getattr(company, "team", None)
     parts: list[str] = []
-    if getattr(company, "artifact_values", ""):
-        parts.append(company.artifact_values[:400])
+    mission = (org.mission if org is not None else None) or ""
+    if mission:
+        parts.append(mission[:400])
     if getattr(company, "artifact_role_spec", ""):
         parts.append(company.artifact_role_spec[:400])
-    if getattr(company, "artifact_team_structure", ""):
-        parts.append(company.artifact_team_structure[:300])
-    if getattr(company, "artifact_sample_comms", ""):
-        parts.append(company.artifact_sample_comms[:200])
+    team_structure = (team.artifact_team_structure if team is not None else None) or ""
+    if team_structure:
+        parts.append(team_structure[:300])
+    sample_comms = (team.artifact_sample_comms if team is not None else None) or ""
+    if sample_comms:
+        parts.append(sample_comms[:200])
     return "\n---\n".join(parts) if parts else "(none provided)"
 
 

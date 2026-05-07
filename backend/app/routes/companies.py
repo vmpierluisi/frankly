@@ -39,10 +39,13 @@ def create_company(
             detail=f"Company id '{company_id}' already exists.",
         )
 
-    # Build the Company. If team_id is supplied, attach to that team.
-    # Otherwise the legacy back-compat __init__ auto-creates a fresh
-    # Org + Team from any legacy artifact_* kwargs (kept for the old
-    # TemplateSetup form during the PR #2d transition).
+    # Build the Company under an Organization → Team. If ``team_id`` is
+    # supplied, attach to that team. Otherwise the legacy artefact_* fields
+    # on the payload (still posted by the old TemplateSetup pre-#2d UI) are
+    # used to spin up a fresh Org + Team here, explicitly. The previous
+    # version of this branch relied on a back-compat ``Company.__init__``
+    # that absorbed those kwargs; PR #2d.4.b moves the absorption out of the
+    # model and into this single call site so the model stays clean.
     company_kwargs: dict = dict(
         id=company_id,
         name=payload.name,
@@ -62,14 +65,24 @@ def create_company(
         company_kwargs["team_id"] = team.id
         company_kwargs["organization_id"] = team.organization_id
     else:
-        if payload.tagline is not None:
-            company_kwargs["tagline"] = payload.tagline
-        if payload.artifact_values is not None:
-            company_kwargs["artifact_values"] = payload.artifact_values
-        if payload.artifact_team_structure is not None:
-            company_kwargs["artifact_team_structure"] = payload.artifact_team_structure
-        if payload.artifact_sample_comms is not None:
-            company_kwargs["artifact_sample_comms"] = payload.artifact_sample_comms
+        # Legacy path: spin up an Org + Team from the payload's artefact
+        # fields so the new Position has somewhere to live.
+        org = models.Organization(
+            name=payload.name,
+            tagline=payload.tagline,
+            mission=payload.artifact_values or "",
+        )
+        db.add(org)
+        team = models.Team(
+            organization=org,
+            name=f"{payload.name} core team",
+            artifact_team_structure=payload.artifact_team_structure or "",
+            artifact_sample_comms=payload.artifact_sample_comms or "",
+        )
+        db.add(team)
+        db.flush()  # populate org.id / team.id for the FK assignment below
+        company_kwargs["organization_id"] = org.id
+        company_kwargs["team_id"] = team.id
     company = models.Company(**company_kwargs)
     for i, crit in enumerate(payload.criteria):
         company.criteria.append(

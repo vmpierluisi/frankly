@@ -41,17 +41,33 @@ class _StubCriterion:
         self.weight = 0.25
 
 
-class _StubCompany:
-    id = "meridian-capital"
-    team_id = "team-meridian"
+class _StubOrg:
+    id = "org-meridian"
     name = "Meridian Capital"
-    role = "Associate, Private Credit"
     tagline = "Patience as a competitive edge."
-    artifact_values = "We value written rigor."
-    artifact_role_spec = "Analysts own deal memos end-to-end."
+    mission = "We value written rigor."
+
+
+class _StubTeam:
+    id = "team-meridian"
+    organization_id = "org-meridian"
+    name = "Meridian core team"
     artifact_team_structure = "Pod: 1 VP + 2 analysts."
     artifact_sample_comms = "IRR below hurdle. Recommend pass."
     knowledge_graph = None
+    teammates: list = []
+    scenarios: list = []
+
+
+class _StubCompany:
+    id = "meridian-capital"
+    organization_id = "org-meridian"
+    team_id = "team-meridian"
+    name = "Meridian Capital"
+    role = "Associate, Private Credit"
+    artifact_role_spec = "Analysts own deal memos end-to-end."
+    organization = _StubOrg()
+    team = _StubTeam()
     criteria = [
         _StubCriterion("analyticalRigor", "Analytical Rigor", "Depth of quantitative analysis.", 0),
         _StubCriterion("writtenDissent", "Written Dissent", "Disagrees in writing.", 1),

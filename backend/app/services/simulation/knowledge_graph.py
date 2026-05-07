@@ -189,13 +189,15 @@ def validate_graph(graph: dict[str, Any]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _render_user_prompt(company: "Company") -> str:
+    org = getattr(company, "organization", None)
+    team = getattr(company, "team", None)
     return KNOWLEDGE_GRAPH_USER_TEMPLATE.format(
         company_name=company.name,
         role=company.role,
-        artifact_values=company.artifact_values or "(none provided)",
+        artifact_values=(org.mission if org is not None else None) or "(none provided)",
         artifact_role_spec=company.artifact_role_spec or "(none provided)",
-        artifact_team_structure=company.artifact_team_structure or "(none provided)",
-        artifact_sample_comms=company.artifact_sample_comms or "(none provided)",
+        artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
+        artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
     )
 
 

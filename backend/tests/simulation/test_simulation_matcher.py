@@ -88,21 +88,38 @@ class _StubScenario:
         self.is_llm_drafted = True
 
 
-class _StubCompany:
-    id = "meridian"
+class _StubOrg:
+    id = "org-meridian"
     name = "Meridian Capital"
-    role = "Associate"
     tagline = "Patient capital."
-    artifact_values = "Intellectual honesty."
-    artifact_role_spec = "Analysts own memos."
+    mission = "Intellectual honesty."
+
+
+class _StubTeam:
+    id = "team-meridian"
+    organization_id = "org-meridian"
+    name = "Meridian core team"
     artifact_team_structure = "Pod structure."
     artifact_sample_comms = "IRR below hurdle."
     knowledge_graph = None
 
     def __init__(self, *, has_team=True, has_scenarios=True):
-        self.criteria = [_StubCriterion("written_rigor", "Written Rigor", "Clear writing.", 1.0)]
         self.teammates = [_StubTeammate()] if has_team else []
         self.scenarios = [_StubScenario()] if has_scenarios else []
+
+
+class _StubCompany:
+    id = "meridian"
+    organization_id = "org-meridian"
+    team_id = "team-meridian"
+    name = "Meridian Capital"
+    role = "Associate"
+    artifact_role_spec = "Analysts own memos."
+
+    def __init__(self, *, has_team=True, has_scenarios=True):
+        self.organization = _StubOrg()
+        self.team = _StubTeam(has_team=has_team, has_scenarios=has_scenarios)
+        self.criteria = [_StubCriterion("written_rigor", "Written Rigor", "Clear writing.", 1.0)]
 
 
 class _StubCandidate:

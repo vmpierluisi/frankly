@@ -99,16 +99,33 @@ def _make_canned_graph(
     return {"nodes": nodes, "edges": edges}
 
 
-class _StubCompany:
-    id = "meridian-capital"
+class _StubOrg:
+    id = "org-meridian"
     name = "Meridian Capital"
-    role = "Associate, Private Credit"
     tagline = "Patience as a competitive edge."
-    artifact_values = "We value written rigor and intellectual honesty."
-    artifact_role_spec = "Analysts own deal memos end-to-end."
+    mission = "We value written rigor and intellectual honesty."
+
+
+class _StubTeam:
+    id = "team-meridian"
+    organization_id = "org-meridian"
+    name = "Meridian core team"
     artifact_team_structure = "Pod structure: 1 VP + 2 analysts per pod."
     artifact_sample_comms = "Example memo: 'IRR below hurdle; recommend pass.'"
     knowledge_graph = None
+    teammates: list = []
+    scenarios: list = []
+
+
+class _StubCompany:
+    id = "meridian-capital"
+    organization_id = "org-meridian"
+    team_id = "team-meridian"
+    name = "Meridian Capital"
+    role = "Associate, Private Credit"
+    artifact_role_spec = "Analysts own deal memos end-to-end."
+    organization = _StubOrg()
+    team = _StubTeam()
     criteria = []
 
 

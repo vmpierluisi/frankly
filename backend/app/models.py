@@ -295,80 +295,28 @@ class Company(Base):
         "Match", back_populates="company", cascade="all, delete-orphan"
     )
 
-    # ⚠️ DEPRECATED: legacy-kwargs constructor.
-    # Existing fixtures + a few service paths still construct Company with
-    # the old artifact_values / tagline / artifact_team_structure /
-    # artifact_sample_comms / knowledge_graph kwargs. We absorb them here
-    # by lazily creating an Organization + Team so call sites keep working
-    # during the PR #2d migration window.
-    #
-    # REMOVE AFTER: ROADMAP_2 PR #2d.4 (rename + cleanup). All call sites
-    # should construct Org/Team explicitly by then.
-    _LEGACY_ORG_KEYS = ("tagline", "artifact_values")
-    _LEGACY_TEAM_KEYS = (
-        "artifact_team_structure",
-        "artifact_sample_comms",
-        "knowledge_graph",
-    )
-
     def __init__(self, **kwargs):
-        legacy_org = {k: kwargs.pop(k) for k in list(self._LEGACY_ORG_KEYS) if k in kwargs}
-        legacy_team = {k: kwargs.pop(k) for k in list(self._LEGACY_TEAM_KEYS) if k in kwargs}
+        """Auto-provision a default Organization + Team when neither is given.
 
+        New callers should explicitly pass ``organization_id`` + ``team_id``
+        (or ``organization`` / ``team`` relationship objects). This shim
+        only covers the case of building a Position from scratch with no
+        prior Org/Team context — used by seed scripts and a small handful
+        of test fixtures that don't bring their own hierarchy.
+        """
         has_org = ("organization_id" in kwargs) or (kwargs.get("organization") is not None)
         has_team = ("team_id" in kwargs) or (kwargs.get("team") is not None)
 
         if not has_org:
             kwargs["organization"] = Organization(
                 name=kwargs.get("name", "Untitled"),
-                tagline=legacy_org.get("tagline"),
-                mission=legacy_org.get("artifact_values", "") or "",
             )
         if not has_team:
             kwargs["team"] = Team(
                 organization=kwargs.get("organization"),
                 name=f"{kwargs.get('name', 'team')} core team",
-                artifact_team_structure=legacy_team.get("artifact_team_structure", "") or "",
-                artifact_sample_comms=legacy_team.get("artifact_sample_comms", "") or "",
-                knowledge_graph=legacy_team.get("knowledge_graph"),
             )
         super().__init__(**kwargs)
-
-    # ⚠️ DEPRECATED: pass-through accessors.
-    # Convenience for service code that still does ``company.teammates``,
-    # ``company.artifact_values``, ``company.knowledge_graph``, etc.
-    # New code should reference ``company.team.teammates`` and
-    # ``company.organization.mission`` explicitly so the data model is
-    # honest at the call site.
-    #
-    # REMOVE AFTER: ROADMAP_2 PR #2d.4 — once consumers are updated.
-    @property
-    def teammates(self) -> list["SyntheticTeammate"]:
-        return self.team.teammates if self.team else []
-
-    @property
-    def scenarios(self) -> list["MomentOfTruth"]:
-        return self.team.scenarios if self.team else []
-
-    @property
-    def tagline(self) -> str | None:
-        return self.organization.tagline if self.organization else None
-
-    @property
-    def artifact_values(self) -> str:
-        return self.organization.mission if self.organization else ""
-
-    @property
-    def artifact_team_structure(self) -> str:
-        return self.team.artifact_team_structure if self.team else ""
-
-    @property
-    def artifact_sample_comms(self) -> str:
-        return self.team.artifact_sample_comms if self.team else ""
-
-    @property
-    def knowledge_graph(self) -> dict | None:
-        return self.team.knowledge_graph if self.team else None
 
 
 class Criterion(Base):

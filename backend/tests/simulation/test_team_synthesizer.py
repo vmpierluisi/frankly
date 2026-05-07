@@ -38,13 +38,17 @@ class _StubCriterion:
         self.weight = 0.25
 
 
-class _StubCompany:
-    id = "meridian-capital"
+class _StubOrg:
+    id = "org-meridian"
     name = "Meridian Capital"
-    role = "Associate, Private Credit"
     tagline = "Patience as a competitive edge."
-    artifact_values = "We value written rigor and intellectual honesty above all."
-    artifact_role_spec = "Analysts own deal memos end-to-end."
+    mission = "We value written rigor and intellectual honesty above all."
+
+
+class _StubTeam:
+    id = "team-meridian"
+    organization_id = "org-meridian"
+    name = "Meridian core team"
     artifact_team_structure = "Pod structure: 1 VP + 2 analysts per pod."
     artifact_sample_comms = "IRR below hurdle. Recommend pass."
     knowledge_graph = {
@@ -54,6 +58,19 @@ class _StubCompany:
         ],
         "edges": [],
     }
+    teammates: list = []
+    scenarios: list = []
+
+
+class _StubCompany:
+    id = "meridian-capital"
+    organization_id = "org-meridian"
+    team_id = "team-meridian"
+    name = "Meridian Capital"
+    role = "Associate, Private Credit"
+    artifact_role_spec = "Analysts own deal memos end-to-end."
+    organization = _StubOrg()
+    team = _StubTeam()
     criteria = [
         _StubCriterion("analyticalRigor", "Analytical Rigor",
                        "Depth of quantitative analysis.", ordering=0),
@@ -217,13 +234,21 @@ def test_render_criteria_block_empty():
 
 def test_render_prompt_no_artifacts_uses_placeholder():
     """Absent artifacts render as '(none provided)' not empty string."""
-    class _Bare(_StubCompany):
-        artifact_values = ""
-        artifact_role_spec = ""
+    class _BareOrg:
+        id = "o"; name = "Bare"; tagline = None; mission = ""
+
+    class _BareTeam:
+        id = "t"; organization_id = "o"; name = "Bare core team"
         artifact_team_structure = ""
         artifact_sample_comms = ""
         knowledge_graph = None
-        tagline = None
+        teammates: list = []
+        scenarios: list = []
+
+    class _Bare(_StubCompany):
+        artifact_role_spec = ""
+        organization = _BareOrg()
+        team = _BareTeam()
 
     prompt = _render_centroid_user_prompt(_Bare())
     assert "(none provided)" in prompt

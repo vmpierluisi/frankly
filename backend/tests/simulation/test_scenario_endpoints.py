@@ -79,14 +79,23 @@ def client(db_session):
 # ---------------------------------------------------------------------------
 
 def _seed_company(db_session) -> models.Company:
-    company = models.Company(
-        id="test-co",
-        name="Test Co",
-        role="Analyst",
-        artifact_values="We value rigor.",
-        artifact_role_spec="Own the memo.",
+    org = models.Organization(name="Test Co", mission="We value rigor.")
+    db_session.add(org)
+    team = models.Team(
+        organization=org,
+        name="Test Co core team",
         artifact_team_structure="Two analysts per pod.",
         artifact_sample_comms="Pass on this one.",
+    )
+    db_session.add(team)
+    db_session.flush()
+    company = models.Company(
+        id="test-co",
+        organization_id=org.id,
+        team_id=team.id,
+        name="Test Co",
+        role="Analyst",
+        artifact_role_spec="Own the memo.",
     )
     company.criteria.append(
         models.Criterion(key="analyticalRigor", label="Analytical Rigor",

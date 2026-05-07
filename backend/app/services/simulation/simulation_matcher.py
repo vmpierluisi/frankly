@@ -124,6 +124,8 @@ def _candidate_label(candidate: "Candidate") -> str:
 # ---------------------------------------------------------------------------
 
 def _teammates_as_dicts(company: "Company") -> list[dict[str, Any]]:
+    team = getattr(company, "team", None)
+    teammates = (team.teammates if team is not None else None) or []
     return [
         {
             "id": t.id,
@@ -134,7 +136,7 @@ def _teammates_as_dicts(company: "Company") -> list[dict[str, Any]]:
             "trait_sheet": t.trait_sheet or {},
             "private_goals": t.private_goals or [],
         }
-        for t in (company.teammates or [])
+        for t in teammates
     ]
 
 
@@ -151,15 +153,17 @@ def _criteria_as_dicts(company: "Company") -> list[dict[str, Any]]:
 
 
 def _company_as_dict(company: "Company") -> dict[str, Any]:
+    org = getattr(company, "organization", None)
+    team = getattr(company, "team", None)
     return {
         "id": company.id,
         "name": company.name,
         "role": company.role,
-        "tagline": company.tagline or "",
-        "artifact_values": company.artifact_values or "",
+        "tagline": (org.tagline if org is not None else None) or "",
+        "artifact_values": (org.mission if org is not None else None) or "",
         "artifact_role_spec": company.artifact_role_spec or "",
-        "artifact_team_structure": company.artifact_team_structure or "",
-        "artifact_sample_comms": company.artifact_sample_comms or "",
+        "artifact_team_structure": (team.artifact_team_structure if team is not None else None) or "",
+        "artifact_sample_comms": (team.artifact_sample_comms if team is not None else None) or "",
         "criteria": _criteria_as_dicts(company),
     }
 
@@ -209,7 +213,10 @@ async def run_match(
             detail="Company has no synthetic team — synthesize the team first.",
         )
 
-    scenarios: list["MomentOfTruth"] = list(getattr(company, "scenarios", []) or [])
+    team = getattr(company, "team", None)
+    scenarios: list["MomentOfTruth"] = list(
+        (team.scenarios if team is not None else None) or []
+    )
     if not scenarios:
         raise HTTPException(
             status_code=409,

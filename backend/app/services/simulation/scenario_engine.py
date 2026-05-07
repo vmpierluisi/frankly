@@ -171,16 +171,18 @@ def validate_scoring_dims(
 # ---------------------------------------------------------------------------
 
 def _render_drafter_user_prompt(company: "Company") -> str:
+    org = getattr(company, "organization", None)
+    team = getattr(company, "team", None)
     return SCENARIO_DRAFTER_USER_TEMPLATE.format(
         company_name=company.name,
         role=company.role,
         criteria_block=_render_criteria_block(company),
-        artifact_values=company.artifact_values or "(none provided)",
+        artifact_values=(org.mission if org is not None else None) or "(none provided)",
         artifact_role_spec=company.artifact_role_spec or "(none provided)",
-        artifact_team_structure=company.artifact_team_structure or "(none provided)",
-        artifact_sample_comms=company.artifact_sample_comms or "(none provided)",
+        artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
+        artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
         knowledge_graph_summary=summarize_for_prompt(
-            getattr(company, "knowledge_graph", None)
+            (team.knowledge_graph if team is not None else None)
         ),
     )
 

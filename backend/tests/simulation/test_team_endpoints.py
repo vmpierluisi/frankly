@@ -83,14 +83,23 @@ def client(db_session):
 # ---------------------------------------------------------------------------
 
 def _seed_company(db_session) -> models.Company:
-    company = models.Company(
-        id="test-co",
-        name="Test Co",
-        role="Analyst",
-        artifact_values="We value rigor.",
-        artifact_role_spec="Own the memo.",
+    org = models.Organization(name="Test Co", mission="We value rigor.")
+    db_session.add(org)
+    team = models.Team(
+        organization=org,
+        name="Test Co core team",
         artifact_team_structure="Two analysts per pod.",
         artifact_sample_comms="Pass on this one.",
+    )
+    db_session.add(team)
+    db_session.flush()
+    company = models.Company(
+        id="test-co",
+        organization_id=org.id,
+        team_id=team.id,
+        name="Test Co",
+        role="Analyst",
+        artifact_role_spec="Own the memo.",
     )
     db_session.add(company)
     db_session.commit()
@@ -232,11 +241,11 @@ def test_patch_teammate_404_wrong_company(client, db_session):
 
     teammate_id = syn.json()[0]["id"]
 
-    # Create second company without teammates
+    # Create second company without teammates (auto-creates Org + Team via
+    # Company.__init__ since none was supplied).
     db_session.add(models.Company(
         id="other-co", name="Other Co", role="Analyst",
-        artifact_values="", artifact_role_spec="",
-        artifact_team_structure="", artifact_sample_comms="",
+        artifact_role_spec="",
     ))
     db_session.commit()
 
