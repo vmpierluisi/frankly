@@ -14,11 +14,18 @@ from ..openrouter import chat_json_with_retry
 from ...config import settings
 
 # Per-model price table (USD per 1K tokens). Update when model pricing changes.
+# OpenRouter rates last verified 2026-05-06 from the model listing pages.
 _MODEL_PRICES: dict[str, dict[str, float]] = {
     "anthropic/claude-sonnet-4.6":      {"in": 0.003,    "out": 0.015},
     "anthropic/claude-haiku-4.5":       {"in": 0.0008,   "out": 0.004},
-    "google/gemma-4-31b-it":            {"in": 0.00014,  "out": 0.0004},  # Venice / DeepInfra
-    "google/gemini-3-flash-preview":    {"in": 0.0,      "out": 0.0},    # preview — free tier
+    # Gemma 4 31B IT — Venice / DeepInfra pricing.
+    "google/gemma-4-31b-it":            {"in": 0.00013,  "out": 0.00038},
+    # Backwards-compat: Gemma 3 27B IT (the default before the .env override).
+    "google/gemma-3-27b-it":            {"in": 0.0001,   "out": 0.00018},
+    # Gemini 3 Flash Preview — paid preview tier.
+    "google/gemini-3-flash-preview":    {"in": 0.0005,   "out": 0.003},
+    # Backwards-compat alias for Gemini 2.5 Flash.
+    "google/gemini-2.5-flash":          {"in": 0.0003,   "out": 0.0025},
 }
 # Conservative fallback for unknown models — Sonnet pricing. We deliberately
 # do NOT key this off settings.openrouter_model: the configured model can be

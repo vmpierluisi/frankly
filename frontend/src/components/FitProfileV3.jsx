@@ -154,6 +154,17 @@ export default function FitProfileV3({
         </div>
       )}
 
+      {/* Skills-fit decomposition — only when the position has required_skills */}
+      {skillsFitDetails && Array.isArray(skillsFitDetails.per_skill) && (
+        <>
+          <hr className="rule-thick" style={{ margin: "32px 0 24px" }} />
+          <div className="label-mono" style={{ marginBottom: 16 }}>
+            Skills match · {skillsFitDetails.score}/100
+          </div>
+          <SkillsBreakdown rows={skillsFitDetails.per_skill} />
+        </>
+      )}
+
       <hr className="rule-thick" style={{ margin: "32px 0 24px" }} />
 
       {/* Dimensional fit chart — tappable rows */}
@@ -657,5 +668,78 @@ function SubScore({ label, value }) {
         {value}
       </div>
     </div>
+  );
+}
+
+
+// ===========================================================================
+// SkillsBreakdown — per-required-skill coverage table.
+// Each row is a required skill mapped against the candidate's capability
+// ledger: covered (green), limited (amber), absent (red).
+// ===========================================================================
+const _COVERAGE_STYLE = {
+  covered: { label: "covered", color: "#0a6640", bg: "#dff3e6" },
+  limited: { label: "limited", color: "#7d5a00", bg: "#fbecc7" },
+  absent: { label: "absent", color: "#9e2a2a", bg: "#f4d7d7" },
+};
+
+function SkillsBreakdown({ rows }) {
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+      {rows.map((r, i) => {
+        const style = _COVERAGE_STYLE[r.coverage] || _COVERAGE_STYLE.absent;
+        return (
+          <li
+            key={i}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "10px 0",
+              borderBottom: `1px solid ${COLORS.rule}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>
+                {r.skill}
+              </div>
+              <span
+                className="label-mono"
+                style={{ fontSize: 10, color: COLORS.muted }}
+              >
+                level: {r.level}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                style={{
+                  background: style.bg,
+                  color: style.color,
+                  fontFamily: FONT_MONO,
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  padding: "3px 10px",
+                  border: `1px solid ${style.color}33`,
+                }}
+              >
+                {style.label}
+              </span>
+              <span
+                style={{
+                  fontFamily: FONT_MONO,
+                  fontSize: 14,
+                  minWidth: 36,
+                  textAlign: "right",
+                  color: COLORS.ink,
+                }}
+              >
+                {r.score}
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

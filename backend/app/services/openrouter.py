@@ -30,7 +30,7 @@ _GLOBAL_OPENROUTER_SEM = asyncio.Semaphore(
     int(os.environ.get("OPENROUTER_GLOBAL_CONCURRENCY", "16"))
 )
 
-_RETRY_DELAYS = (1.0, 2.0, 4.0)  # 3 retries; 7s total worst-case wait
+_RETRY_DELAYS = (1.0, 2.0, 4.0, 8.0, 12.0)  # up to 5 retries; ~27s total worst-case wait
 
 
 class OpenRouterError(RuntimeError):
@@ -47,7 +47,7 @@ class FatalError(OpenRouterError):
 
 
 async def chat_json_with_retry(
-    *args, max_attempts: int = 4, **kwargs
+    *args, max_attempts: int = 6, **kwargs
 ) -> dict[str, Any]:
     """Thin retry wrapper around chat_json with exponential backoff."""
     last_exc: Exception | None = None
@@ -155,6 +155,19 @@ async def chat_json(
 
     body = resp.json()
     usage = body.get("usage", {})
+
+    # OpenRouter sometimes returns HTTP 200 with an upstream error in the body
+    # (e.g. provider gateway 504). Surface those as the right exception type:
+    # retryable for 5xx + 429, fatal for everything else.
+    upstream_error = body.get("error")
+    if upstream_error:
+        code = upstream_error.get("code")
+        msg = upstream_error.get("message", "")
+        if code in (408, 429) or (isinstance(code, int) and 500 <= code <= 599):
+            raise RetryableError(
+                f"OpenRouter upstream {code}: {msg[:300]}"
+            )
+        raise FatalError(f"OpenRouter upstream error {code}: {msg[:300]}")
 
     try:
         content = body["choices"][0]["message"]["content"]
