@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, matches } from "../api.js";
+import { positions, matches } from "../api.js";
 import FitProfileV3 from "./FitProfileV3.jsx";
 import { GeneratingScreen } from "./Widgets.jsx";
 
@@ -29,7 +29,7 @@ export default function PositionLeaderboard({ companyId }) {
 
   async function load() {
     try {
-      const result = await companies.leaderboard(companyId);
+      const result = await positions.leaderboard(companyId);
       setData(result);
       setError("");
 

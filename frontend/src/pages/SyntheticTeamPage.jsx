@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, team } from "../api.js";
+import { positions, team } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import TeammateCard from "../components/TeammateCard.jsx";
 
@@ -20,7 +20,7 @@ export default function SyntheticTeamPage() {
 
   useEffect(() => {
     Promise.all([
-      companies.get(companyId),
+      positions.get(companyId),
       team.list(companyId),
     ])
       .then(([co, tm]) => {
@@ -102,7 +102,7 @@ export default function SyntheticTeamPage() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             className="ghost"
-            onClick={() => nav(`/manager/companies/${companyId}/scenarios`)}
+            onClick={() => nav(`/manager/positions/${companyId}/scenarios`)}
             style={{ padding: "12px 20px" }}
           >
             Scenarios →

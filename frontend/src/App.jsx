@@ -89,7 +89,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/companies/:companyId/team"
+          path="/manager/positions/:companyId/team"
           element={
             <RequireAuth auth={auth} role="manager">
               <SyntheticTeamPage />
@@ -97,7 +97,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/companies/:companyId/scenarios"
+          path="/manager/positions/:companyId/scenarios"
           element={
             <RequireAuth auth={auth} role="manager">
               <ScenarioLibraryPage />

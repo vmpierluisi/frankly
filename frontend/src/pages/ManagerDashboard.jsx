@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates, companies, organizations } from "../api.js";
+import { candidates, positions, organizations } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 import Tabs from "../components/Tabs.jsx";
@@ -62,7 +62,7 @@ export default function ManagerDashboard() {
 
   useEffect(() => {
     Promise.all([
-      companies.list(),
+      positions.list(),
       candidates.list({ is_seed: true }),
     ])
       .then(([cos, seeds]) => {
@@ -454,8 +454,8 @@ function PositionsTab({
             selected={selectedCompany === c.id}
             onSelect={() => setSelectedCompany(c.id)}
             onEdit={(e) => { e.stopPropagation(); nav(`/manager/templates/${c.id}`); }}
-            onViewTeam={(e) => { e.stopPropagation(); nav(`/manager/companies/${c.id}/team`); }}
-            onViewScenarios={(e) => { e.stopPropagation(); nav(`/manager/companies/${c.id}/scenarios`); }}
+            onViewTeam={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/team`); }}
+            onViewScenarios={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/scenarios`); }}
           />
         ))}
         {companyList.length === 0 && (

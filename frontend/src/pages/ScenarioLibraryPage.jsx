@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, scenarios } from "../api.js";
+import { positions, scenarios } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import ScenarioCard from "../components/ScenarioCard.jsx";
 
@@ -39,7 +39,7 @@ export default function ScenarioLibraryPage() {
   const [createError, setCreateError] = useState("");
 
   useEffect(() => {
-    Promise.all([companies.get(companyId), scenarios.list(companyId)])
+    Promise.all([positions.get(companyId), scenarios.list(companyId)])
       .then(([co, sc]) => {
         setCompany(co);
         setScenarioList(sc);
@@ -124,7 +124,7 @@ export default function ScenarioLibraryPage() {
         </button>
         <span style={{ color: COLORS.rule }}>›</span>
         <button
-          onClick={() => nav(`/manager/companies/${companyId}/team`)}
+          onClick={() => nav(`/manager/positions/${companyId}/team`)}
           style={{ background: "none", border: "none", fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: COLORS.muted, cursor: "pointer", padding: 0 }}
         >
           {company?.name || companyId}

@@ -114,11 +114,11 @@ export const teams = {
 };
 
 // ---------- Company endpoints (legacy: a Company is a Position) ----------
-export const companies = {
-  list: () => request("/companies", { auth: true }),
+export const positions = {
+  list: () => request("/positions", { auth: true }),
   get: (id) => request(`/companies/${id}`, { auth: true }),
   create: (payload) =>
-    request("/companies", { method: "POST", body: payload, auth: true }),
+    request("/positions", { method: "POST", body: payload, auth: true }),
   update: (id, payload) =>
     request(`/companies/${id}`, { method: "PUT", body: payload, auth: true }),
   remove: (id) =>

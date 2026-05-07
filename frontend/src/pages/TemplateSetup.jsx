@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, organizations, teams, templates } from "../api.js";
+import { positions, organizations, teams, templates } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 
 // Manager-facing template setup. Two-step flow:
@@ -200,8 +200,8 @@ export default function TemplateSetup() {
     };
     try {
       const saved = companyId
-        ? await companies.update(companyId, payload)
-        : await companies.create(payload);
+        ? await positions.update(companyId, payload)
+        : await positions.create(payload);
       nav(`/manager`, { state: { savedCompany: saved.id } });
     } catch (e) {
       setError(e.message);

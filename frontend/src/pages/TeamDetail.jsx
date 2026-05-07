@@ -81,10 +81,10 @@ export default function TeamDetail() {
         <SimulationLinksCard
           team={team}
           onOpenTeammates={(positionId) =>
-            nav(`/manager/companies/${positionId}/team`)
+            nav(`/manager/positions/${positionId}/team`)
           }
           onOpenScenarios={(positionId) =>
-            nav(`/manager/companies/${positionId}/scenarios`)
+            nav(`/manager/positions/${positionId}/scenarios`)
           }
         />
       )}
