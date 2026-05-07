@@ -172,7 +172,7 @@ def test_draft_creates_scenarios(client, db_session):
     assert len(data) == 2
     assert data[0]["title"] == "IC Memo Pressure"
     assert data[0]["is_llm_drafted"] is True
-    assert data[0]["company_id"] == "test-co"
+    assert data[0]["team_id"] is not None
 
 
 def test_draft_404_unknown_company(client, db_session):

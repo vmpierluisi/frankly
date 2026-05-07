@@ -152,20 +152,114 @@ class VerifiedProfile(Base):
 
 
 # ----------------------------------------------------------------------------
-# Companies + criteria
+# Roadmap 2 / PR #2d — three-tier hierarchy:
+#   Organization  → owns culture (mission, code_of_conduct, tagline).
+#   Team          → owns the people + scenarios the simulation uses
+#                   (synthetic teammates, scenarios, team_structure,
+#                   sample_comms, knowledge_graph).
+#   Company (Position internally) → owns role-specific config
+#                   (role title, role_family, seniority, criteria,
+#                   required_skills, role_spec).
+#
+# Note: the table is still named ``companies`` and the class still ``Company``
+# to keep the diff small. UI surfaces this entity as "Position" everywhere.
 # ----------------------------------------------------------------------------
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    tagline: Mapped[str | None] = mapped_column(String(500), default=None)
+    mission: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    code_of_conduct: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow
+    )
+
+    teams: Mapped[list["Team"]] = relationship(
+        "Team",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        order_by="Team.created_at",
+    )
+
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    organization_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    artifact_team_structure: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    artifact_sample_comms: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    knowledge_graph: Mapped[dict | None] = mapped_column(JSON, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, onupdate=_utcnow
+    )
+
+    organization: Mapped[Organization] = relationship(
+        "Organization", back_populates="teams"
+    )
+    positions: Mapped[list["Company"]] = relationship(
+        "Company",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        order_by="Company.created_at",
+    )
+    teammates: Mapped[list["SyntheticTeammate"]] = relationship(
+        "SyntheticTeammate",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        order_by="SyntheticTeammate.ordering",
+    )
+    scenarios: Mapped[list["MomentOfTruth"]] = relationship(
+        "MomentOfTruth",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        order_by="MomentOfTruth.ordering",
+    )
+
+
 class Company(Base):
+    """⚠️ NAMING DEBT: this class is a *Position*, not a company.
+
+    Kept the legacy name (``Company`` / ``companies`` table) to bound the
+    blast radius of the PR #2d schema split. Conceptually:
+
+        Organization → Team → Company (= Position / vacancy)
+
+    Owns role-specific config only — culture/team-structure/teammates
+    bubble up via ``self.team`` and ``self.team.organization``.
+
+    Cleanup: ROADMAP_2 PR #2d.4 renames the class + table to ``Position``
+    once dual-score (#2d.3) is validated through real usage.
+    """
     __tablename__ = "companies"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    organization_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    team_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    tagline: Mapped[str | None] = mapped_column(String(500), default=None)
     role: Mapped[str] = mapped_column(String(200), nullable=False)
 
-    # Simulation pipeline — extracted knowledge graph (Phase 2A+).
-    knowledge_graph: Mapped[dict | None] = mapped_column(JSON, default=None)
-
-    # Candidate-driven matching — vacancy metadata.
     role_family: Mapped[str | None] = mapped_column(
         String(64), nullable=True, index=True, default=None
     )
@@ -174,24 +268,23 @@ class Company(Base):
     )
     is_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    # Roadmap 2 / PR #2a — required skills + skill-match weight.
-    # required_skills: list of {"skill": str, "level": "junior"|"mid"|"senior"}.
-    # skill_match_weight: 0..1 fraction of overall fit driven by skills/edu/exp
-    # vs. simulation behavior (configurable per vacancy; default 0.4).
+    # Roadmap 2 / PR #2a — required skills (list of {skill, level}).
+    # PR #2d removed skill_match_weight (we now compute skills_fit and
+    # behaviour_fit independently and average them).
     required_skills: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    skill_match_weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.4)
 
-    # Four sanctioned artifacts — text form, already parsed.
-    artifact_values: Mapped[str] = mapped_column(Text, default="")
+    # Position-only artefact: the role spec text. Other artefacts live on
+    # Organization (mission, code_of_conduct) and Team (team_structure,
+    # sample_comms).
     artifact_role_spec: Mapped[str] = mapped_column(Text, default="")
-    artifact_team_structure: Mapped[str] = mapped_column(Text, default="")
-    artifact_sample_comms: Mapped[str] = mapped_column(Text, default="")
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow
     )
 
+    organization: Mapped[Organization] = relationship("Organization")
+    team: Mapped[Team] = relationship("Team", back_populates="positions")
     criteria: Mapped[list["Criterion"]] = relationship(
         "Criterion",
         back_populates="company",
@@ -201,18 +294,81 @@ class Company(Base):
     matches: Mapped[list["Match"]] = relationship(
         "Match", back_populates="company", cascade="all, delete-orphan"
     )
-    teammates: Mapped[list["SyntheticTeammate"]] = relationship(
-        "SyntheticTeammate",
-        back_populates="company",
-        cascade="all, delete-orphan",
-        order_by="SyntheticTeammate.ordering",
+
+    # ⚠️ DEPRECATED: legacy-kwargs constructor.
+    # Existing fixtures + a few service paths still construct Company with
+    # the old artifact_values / tagline / artifact_team_structure /
+    # artifact_sample_comms / knowledge_graph kwargs. We absorb them here
+    # by lazily creating an Organization + Team so call sites keep working
+    # during the PR #2d migration window.
+    #
+    # REMOVE AFTER: ROADMAP_2 PR #2d.4 (rename + cleanup). All call sites
+    # should construct Org/Team explicitly by then.
+    _LEGACY_ORG_KEYS = ("tagline", "artifact_values")
+    _LEGACY_TEAM_KEYS = (
+        "artifact_team_structure",
+        "artifact_sample_comms",
+        "knowledge_graph",
     )
-    scenarios: Mapped[list["MomentOfTruth"]] = relationship(
-        "MomentOfTruth",
-        back_populates="company",
-        cascade="all, delete-orphan",
-        order_by="MomentOfTruth.ordering",
-    )
+
+    def __init__(self, **kwargs):
+        legacy_org = {k: kwargs.pop(k) for k in list(self._LEGACY_ORG_KEYS) if k in kwargs}
+        legacy_team = {k: kwargs.pop(k) for k in list(self._LEGACY_TEAM_KEYS) if k in kwargs}
+
+        has_org = ("organization_id" in kwargs) or (kwargs.get("organization") is not None)
+        has_team = ("team_id" in kwargs) or (kwargs.get("team") is not None)
+
+        if not has_org:
+            kwargs["organization"] = Organization(
+                name=kwargs.get("name", "Untitled"),
+                tagline=legacy_org.get("tagline"),
+                mission=legacy_org.get("artifact_values", "") or "",
+            )
+        if not has_team:
+            kwargs["team"] = Team(
+                organization=kwargs.get("organization"),
+                name=f"{kwargs.get('name', 'team')} core team",
+                artifact_team_structure=legacy_team.get("artifact_team_structure", "") or "",
+                artifact_sample_comms=legacy_team.get("artifact_sample_comms", "") or "",
+                knowledge_graph=legacy_team.get("knowledge_graph"),
+            )
+        super().__init__(**kwargs)
+
+    # ⚠️ DEPRECATED: pass-through accessors.
+    # Convenience for service code that still does ``company.teammates``,
+    # ``company.artifact_values``, ``company.knowledge_graph``, etc.
+    # New code should reference ``company.team.teammates`` and
+    # ``company.organization.mission`` explicitly so the data model is
+    # honest at the call site.
+    #
+    # REMOVE AFTER: ROADMAP_2 PR #2d.4 — once consumers are updated.
+    @property
+    def teammates(self) -> list["SyntheticTeammate"]:
+        return self.team.teammates if self.team else []
+
+    @property
+    def scenarios(self) -> list["MomentOfTruth"]:
+        return self.team.scenarios if self.team else []
+
+    @property
+    def tagline(self) -> str | None:
+        return self.organization.tagline if self.organization else None
+
+    @property
+    def artifact_values(self) -> str:
+        return self.organization.mission if self.organization else ""
+
+    @property
+    def artifact_team_structure(self) -> str:
+        return self.team.artifact_team_structure if self.team else ""
+
+    @property
+    def artifact_sample_comms(self) -> str:
+        return self.team.artifact_sample_comms if self.team else ""
+
+    @property
+    def knowledge_graph(self) -> dict | None:
+        return self.team.knowledge_graph if self.team else None
 
 
 class Criterion(Base):
@@ -244,6 +400,8 @@ class Match(Base):
     candidate_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("candidates.id", ondelete="CASCADE"), index=True
     )
+    # ⚠️ NAMING DEBT: this references a Position (see Company class note).
+    # Renames to ``position_id`` in ROADMAP_2 PR #2d.4.
     company_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("companies.id", ondelete="CASCADE"), index=True
     )
@@ -282,8 +440,8 @@ class SyntheticTeammate(Base):
     __tablename__ = "synthetic_teammates"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    company_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("companies.id", ondelete="CASCADE"), index=True, nullable=False
+    team_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("teams.id", ondelete="CASCADE"), index=True, nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     role_on_team: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -297,7 +455,7 @@ class SyntheticTeammate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    company: Mapped["Company"] = relationship("Company", back_populates="teammates")
+    team: Mapped["Team"] = relationship("Team", back_populates="teammates")
 
 
 # ----------------------------------------------------------------------------
@@ -307,8 +465,8 @@ class MomentOfTruth(Base):
     __tablename__ = "moments_of_truth"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    company_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("companies.id", ondelete="CASCADE"), index=True, nullable=False
+    team_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("teams.id", ondelete="CASCADE"), index=True, nullable=False
     )
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     scenario_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -324,7 +482,7 @@ class MomentOfTruth(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    company: Mapped["Company"] = relationship("Company", back_populates="scenarios")
+    team: Mapped["Team"] = relationship("Team", back_populates="scenarios")
 
 
 # ----------------------------------------------------------------------------

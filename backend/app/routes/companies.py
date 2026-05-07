@@ -39,21 +39,38 @@ def create_company(
             detail=f"Company id '{company_id}' already exists.",
         )
 
-    company = models.Company(
+    # Build the Company. If team_id is supplied, attach to that team.
+    # Otherwise the legacy back-compat __init__ auto-creates a fresh
+    # Org + Team from any legacy artifact_* kwargs (kept for the old
+    # TemplateSetup form during the PR #2d transition).
+    company_kwargs: dict = dict(
         id=company_id,
         name=payload.name,
-        tagline=payload.tagline,
         role=payload.role,
         role_family=payload.role_family,
         target_seniority=payload.target_seniority,
         is_open=payload.is_open,
-        artifact_values=payload.artifact_values,
         artifact_role_spec=payload.artifact_role_spec,
-        artifact_team_structure=payload.artifact_team_structure,
-        artifact_sample_comms=payload.artifact_sample_comms,
         required_skills=[s.model_dump() for s in payload.required_skills],
-        skill_match_weight=payload.skill_match_weight,
     )
+    if payload.team_id is not None:
+        team = db.get(models.Team, payload.team_id)
+        if team is None:
+            raise HTTPException(
+                status_code=404, detail=f"Team {payload.team_id} not found"
+            )
+        company_kwargs["team_id"] = team.id
+        company_kwargs["organization_id"] = team.organization_id
+    else:
+        if payload.tagline is not None:
+            company_kwargs["tagline"] = payload.tagline
+        if payload.artifact_values is not None:
+            company_kwargs["artifact_values"] = payload.artifact_values
+        if payload.artifact_team_structure is not None:
+            company_kwargs["artifact_team_structure"] = payload.artifact_team_structure
+        if payload.artifact_sample_comms is not None:
+            company_kwargs["artifact_sample_comms"] = payload.artifact_sample_comms
+    company = models.Company(**company_kwargs)
     for i, crit in enumerate(payload.criteria):
         company.criteria.append(
             models.Criterion(
@@ -91,18 +108,16 @@ def update_company(
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
+    # PR #2d: position-level fields only. Org / team artefacts are edited
+    # via /organizations/{id} and /teams/{id} respectively. Legacy artifact_*
+    # fields on the payload are silently ignored.
     company.name = payload.name
-    company.tagline = payload.tagline
     company.role = payload.role
     company.role_family = payload.role_family
     company.target_seniority = payload.target_seniority
     company.is_open = payload.is_open
-    company.artifact_values = payload.artifact_values
     company.artifact_role_spec = payload.artifact_role_spec
-    company.artifact_team_structure = payload.artifact_team_structure
-    company.artifact_sample_comms = payload.artifact_sample_comms
     company.required_skills = [s.model_dump() for s in payload.required_skills]
-    company.skill_match_weight = payload.skill_match_weight
 
     # Replace the criteria set wholesale. (The manager approves criteria as a
     # batch during template setup, so partial mutation isn't a v0 need.)
@@ -175,6 +190,16 @@ def get_leaderboard(
                 started_at=match.started_at,
                 finished_at=match.finished_at,
                 error_message=match.error_message,
+                cv_path=candidate.cv_path,
+                linkedin_url=candidate.linkedin_url,
+                github_url=candidate.github_url,
+                portfolio_url=candidate.portfolio_url,
+                profile_accuracy_score=candidate.profile_accuracy_score or 0,
+                # Roadmap 2 / PR #2d.3 — dual scores. Legacy reports without
+                # behaviourFit fall back to overall_score (which was
+                # behaviour-only before this PR).
+                behaviour_fit=(match.report or {}).get("behaviourFit", match.overall_score),
+                skills_fit=(match.report or {}).get("skillsFit"),
             )
         )
 

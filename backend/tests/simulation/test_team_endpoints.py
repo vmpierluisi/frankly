@@ -184,7 +184,7 @@ def test_synthesize_creates_teammates(client, db_session):
     data = resp.json()
     assert len(data) == 5  # DEFAULT_TEAM_SIZE
     for t in data:
-        assert t["company_id"] == "test-co"
+        assert t["team_id"] is not None
         assert t["is_edited"] is False
         assert "trait_sheet" in t
 

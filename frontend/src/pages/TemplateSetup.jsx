@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { companies, templates } from "../api.js";
+import { companies, organizations, teams, templates } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 
 // Manager-facing template setup. Two-step flow:
@@ -23,6 +23,17 @@ const ARTIFACT_FIELDS = [
 export default function TemplateSetup() {
   const nav = useNavigate();
   const { companyId } = useParams();
+  const [searchParams] = useSearchParams();
+  // PR #2d.2 — when a team_id is supplied, this is a position-creation flow
+  // under that team; org-level + team-level fields are hidden because they
+  // already live on the parent Org/Team.
+  const teamIdParam = searchParams.get("team_id") || null;
+  const positionOnly = !!teamIdParam || !!companyId;
+
+  // Roadmap 2 / PR #2d.2: position creation must happen under an existing
+  // team. We no longer support the bare "/manager/templates" no-context flow
+  // — it leaked org-level + team-level fields into per-vacancy forms.
+  const missingContext = !companyId && !teamIdParam;
 
   const [form, setForm] = useState({
     id: "",
@@ -36,8 +47,12 @@ export default function TemplateSetup() {
     artifact_role_spec: "",
     artifact_team_structure: "",
     artifact_sample_comms: "",
+    skill_match_weight: 0.4,
   });
   const [criteria, setCriteria] = useState([]);
+  // Roadmap 2 / PR #2c — required skills for this vacancy. Each row:
+  // { skill: str, level: "junior" | "mid" | "senior" }
+  const [requiredSkills, setRequiredSkills] = useState([]);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,12 +77,39 @@ export default function TemplateSetup() {
           artifact_role_spec: c.artifact_role_spec || "",
           artifact_team_structure: c.artifact_team_structure || "",
           artifact_sample_comms: c.artifact_sample_comms || "",
+          skill_match_weight:
+            typeof c.skill_match_weight === "number" ? c.skill_match_weight : 0.4,
         });
         setCriteria(c.criteria || []);
+        setRequiredSkills(
+          (c.required_skills || []).map((s) => ({
+            skill: s.skill || "",
+            level: s.level || "mid",
+          }))
+        );
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [companyId]);
+
+  // PR #2d.2: when creating a position under a team, prefill the position's
+  // Name from the parent organization's name. The Name field is then locked
+  // in the UI — recruiters edit org names from Settings, not here.
+  useEffect(() => {
+    if (!teamIdParam || companyId) return;
+    let cancelled = false;
+    teams
+      .get(teamIdParam)
+      .then(async (team) => {
+        const org = await organizations.get(team.organization_id);
+        if (cancelled) return;
+        setForm((f) => ({ ...f, name: org.name }));
+      })
+      .catch((e) => setError(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [teamIdParam, companyId]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -145,8 +187,12 @@ export default function TemplateSetup() {
     const payload = {
       ...form,
       id: form.id || undefined,
+      team_id: teamIdParam || undefined,
       role_family: form.role_family || null,
       target_seniority: form.target_seniority || null,
+      required_skills: requiredSkills
+        .map((s) => ({ skill: (s.skill || "").trim(), level: s.level || "mid" }))
+        .filter((s) => s.skill),
       criteria: criteria.map(({ id, ordering, ...c }) => ({
         ...c,
         weight: Number(c.weight) || 0,
@@ -165,6 +211,37 @@ export default function TemplateSetup() {
   }
 
   if (loading) return <GeneratingScreen note="Loading company…" />;
+
+  if (missingContext) {
+    return (
+      <main className="container" style={{ maxWidth: 600 }}>
+        <div className="label-mono" style={{ marginBottom: 12 }}>
+          Manager · New position
+        </div>
+        <h2
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 32,
+            fontWeight: 500,
+            margin: "0 0 12px",
+          }}
+        >
+          Pick a team first.
+        </h2>
+        <p style={{ color: COLORS.muted, fontSize: 16, marginBottom: 20 }}>
+          Positions live under teams, which live under organizations. Open
+          Settings, pick (or create) an organization, then pick a team and use
+          its “+ New position” button.
+        </p>
+        <button
+          className="primary"
+          onClick={() => nav("/manager?tab=settings")}
+        >
+          Go to Settings →
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main className="container">
@@ -193,16 +270,34 @@ export default function TemplateSetup() {
       <div className="label-mono" style={{ marginBottom: 12 }}>1. Identity</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div>
-          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Name</label>
-          <input
-            className="ed"
-            value={form.name}
-            onChange={(e) => update("name", e.target.value)}
-            placeholder="Meridian Capital Partners"
-            autoComplete="off"
-            data-form-type="other"
-            data-lpignore="true"
-          />
+          <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
+            Name
+          </label>
+          {positionOnly ? (
+            <div
+              style={{
+                padding: "12px 14px",
+                border: `1px solid ${COLORS.rule}`,
+                background: COLORS.paper,
+                fontFamily: FONT_DISPLAY,
+                fontSize: 16,
+                color: COLORS.ink,
+              }}
+              title="Inherited from the organization. Edit org name in Settings."
+            >
+              {form.name || "(loading…)"}
+            </div>
+          ) : (
+            <input
+              className="ed"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="Meridian Capital Partners"
+              autoComplete="off"
+              data-form-type="other"
+              data-lpignore="true"
+            />
+          )}
         </div>
         <div>
           <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>Role</label>
@@ -288,7 +383,17 @@ export default function TemplateSetup() {
 
       {/* Artifacts */}
       <div className="label-mono" style={{ marginBottom: 12 }}>2. Sanctioned artifacts</div>
-      {ARTIFACT_FIELDS.map((f) => (
+      {positionOnly && (
+        <p style={{ color: COLORS.muted, fontSize: 13, margin: "0 0 18px" }}>
+          Org-level artefacts (values) and team-level artefacts (team structure
+          + sample communication) live on the parent organization and team —
+          edit those from <em>Settings</em>. This page only collects the
+          role-specification artefact.
+        </p>
+      )}
+      {ARTIFACT_FIELDS.filter(
+        (f) => !positionOnly || f.key === "artifact_role_spec"
+      ).map((f) => (
         <div key={f.key} style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
             <label
@@ -427,6 +532,122 @@ export default function TemplateSetup() {
         </div>
       )}
 
+      {/* ── Required skills + skill-match weight (Roadmap 2 / PR #2c) ──────── */}
+      <hr className="rule" style={{ margin: "32px 0" }} />
+      <div className="label-mono" style={{ marginBottom: 6 }}>4. Required skills</div>
+      <p style={{ color: COLORS.muted, fontSize: 14, margin: "0 0 18px" }}>
+        The skills the simulation should pressure-test. The candidate's
+        capability ledger gets compared against these — gaps surface in the
+        agent's behaviour and feed the skill-match score.
+      </p>
+
+      {requiredSkills.length === 0 && (
+        <div
+          style={{
+            color: COLORS.muted,
+            fontSize: 14,
+            fontStyle: "italic",
+            marginBottom: 12,
+          }}
+        >
+          No required skills yet — add one to start.
+        </div>
+      )}
+
+      {requiredSkills.map((row, i) => (
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 200px auto",
+            gap: 10,
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <input
+            className="ed"
+            value={row.skill}
+            onChange={(e) =>
+              setRequiredSkills(
+                requiredSkills.map((r, j) =>
+                  j === i ? { ...r, skill: e.target.value } : r
+                )
+              )
+            }
+            placeholder="e.g. Python, financial modelling, k8s operator design"
+          />
+          <select
+            className="ed"
+            value={row.level}
+            onChange={(e) =>
+              setRequiredSkills(
+                requiredSkills.map((r, j) =>
+                  j === i ? { ...r, level: e.target.value } : r
+                )
+              )
+            }
+            style={{ cursor: "pointer", fontFamily: FONT_MONO, fontSize: 13 }}
+          >
+            <option value="junior">junior</option>
+            <option value="mid">mid</option>
+            <option value="senior">senior</option>
+          </select>
+          <button
+            className="ghost"
+            onClick={() =>
+              setRequiredSkills(requiredSkills.filter((_, j) => j !== i))
+            }
+            style={{ padding: "8px 12px" }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <button
+        className="ghost"
+        onClick={() =>
+          setRequiredSkills([...requiredSkills, { skill: "", level: "mid" }])
+        }
+        style={{ padding: "8px 14px", marginTop: 4 }}
+      >
+        + Add required skill
+      </button>
+
+      <div style={{ marginTop: 28 }}>
+        <label className="label-mono" style={{ display: "block", marginBottom: 6 }}>
+          Skill / experience weight in overall fit
+        </label>
+        <p style={{ color: COLORS.muted, fontSize: 13, margin: "0 0 10px" }}>
+          Fraction of the overall fit score driven by skills + education +
+          experience match (vs. behavioural simulation). Default 0.4.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, maxWidth: 520 }}>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={form.skill_match_weight}
+            onChange={(e) => update("skill_match_weight", Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 13,
+              minWidth: 110,
+              textAlign: "right",
+              color: COLORS.muted,
+            }}
+          >
+            skills {Math.round((form.skill_match_weight || 0) * 100)}% · behaviour{" "}
+            {Math.round((1 - (form.skill_match_weight || 0)) * 100)}%
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div style={{ color: COLORS.accent, marginTop: 24, fontStyle: "italic" }}>{error}</div>
       )}
@@ -439,4 +660,8 @@ export default function TemplateSetup() {
       </div>
     </main>
   );
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }

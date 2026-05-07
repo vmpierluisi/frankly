@@ -235,24 +235,46 @@ SEED_COMPANIES = [
 # Loader — idempotent; safe to call on every boot.
 # ---------------------------------------------------------------------------
 def seed_companies(db: Session) -> None:
+    """Seed Organization → Team → Position rows from SEED_COMPANIES.
+
+    Each spec produces exactly one Org + one Team + one Position. Existing
+    Position rows are left untouched.
+    """
+    import uuid
+
     for spec in SEED_COMPANIES:
         existing = db.get(models.Company, spec["id"])
         if existing is not None:
-            # Keep existing rows untouched so manager edits aren't overwritten.
             continue
+
+        org = models.Organization(
+            id=str(uuid.uuid4()),
+            name=spec["name"],
+            tagline=spec.get("tagline"),
+            mission=spec.get("artifact_values", ""),
+            code_of_conduct="",
+        )
+        db.add(org)
+
+        team = models.Team(
+            id=str(uuid.uuid4()),
+            organization_id=org.id,
+            name=f"{spec['name']} core team",
+            artifact_team_structure=spec.get("artifact_team_structure", ""),
+            artifact_sample_comms=spec.get("artifact_sample_comms", ""),
+        )
+        db.add(team)
 
         company = models.Company(
             id=spec["id"],
+            organization_id=org.id,
+            team_id=team.id,
             name=spec["name"],
-            tagline=spec.get("tagline"),
             role=spec["role"],
             role_family=spec.get("role_family"),
             target_seniority=spec.get("target_seniority"),
             is_open=spec.get("is_open", True),
-            artifact_values=spec.get("artifact_values", ""),
             artifact_role_spec=spec.get("artifact_role_spec", ""),
-            artifact_team_structure=spec.get("artifact_team_structure", ""),
-            artifact_sample_comms=spec.get("artifact_sample_comms", ""),
         )
         for crit in spec.get("criteria", []):
             company.criteria.append(

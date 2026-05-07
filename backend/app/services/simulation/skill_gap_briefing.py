@@ -152,9 +152,15 @@ async def compute_gap_briefing(
     if not _has_meaningful_ledger(capability_ledger or {}):
         return None
 
-    scenario_title = getattr(scenario, "title", scenario.get("title", "")) if not isinstance(scenario, dict) else scenario.get("title", "")
-    scenario_prompt = getattr(scenario, "prompt", scenario.get("prompt", "")) if not isinstance(scenario, dict) else scenario.get("prompt", "")
-    expected_arc = getattr(scenario, "expected_arc", scenario.get("expected_arc", "")) if not isinstance(scenario, dict) else scenario.get("expected_arc", "")
+    # Accept either a MomentOfTruth ORM object or a plain dict.
+    def _read(field: str) -> str:
+        if isinstance(scenario, dict):
+            return scenario.get(field, "") or ""
+        return getattr(scenario, field, "") or ""
+
+    scenario_title = _read("title")
+    scenario_prompt = _read("prompt")
+    expected_arc = _read("expected_arc")
 
     user_prompt = GAP_BRIEFING_USER_TEMPLATE.format(
         scenario_title=scenario_title or "(untitled)",

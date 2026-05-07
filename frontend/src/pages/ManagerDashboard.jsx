@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates, companies } from "../api.js";
+import { candidates, companies, organizations } from "../api.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
+import Tabs from "../components/Tabs.jsx";
+import KebabMenu from "../components/KebabMenu.jsx";
+import NewPositionModal from "../components/NewPositionModal.jsx";
+
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "positions", label: "Positions" },
+  { id: "settings", label: "Settings" },
+];
 
 // Manager dashboard — position-first leaderboard surface.
 //
@@ -15,11 +24,41 @@ import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 
 export default function ManagerDashboard() {
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [companyList, setCompanyList] = useState([]);
   const [seedCount, setSeedCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCompany, setSelectedCompany] = useState(null);
+  // Tab is mirrored into ?tab=... so other routes can deep-link
+  // ("Positions / + New position" → /manager?tab=settings).
+  const initialTab = searchParams.get("tab") || "overview";
+  const [tab, setTab] = useState(initialTab);
+
+  // Keep the URL in sync when the user switches tabs in the UI.
+  function changeTab(next) {
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "overview") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  }
+
+  // React to back/forward / external nav.
+  useEffect(() => {
+    const t = searchParams.get("tab") || "overview";
+    if (t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const [newPositionOpen, setNewPositionOpen] = useState(false);
+  function openNewPosition() {
+    setNewPositionOpen(true);
+  }
+  function pickedTeam({ team }) {
+    setNewPositionOpen(false);
+    if (team) nav(`/manager/templates?team_id=${team.id}`);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -39,6 +78,12 @@ export default function ManagerDashboard() {
     setError("");
   }, [selectedCompany]);
 
+  // Selecting a position from Overview should jump to the Positions tab.
+  function selectPositionAndShow(id) {
+    setSelectedCompany(id);
+    changeTab("positions");
+  }
+
   if (loading) return <GeneratingScreen note="Loading dashboard…" />;
 
   const company = companyList.find((c) => c.id === selectedCompany);
@@ -56,14 +101,308 @@ export default function ManagerDashboard() {
           margin: "0 0 8px",
         }}
       >
-        Select a position. Review the candidate leaderboard.
+        {tab === "overview"
+          ? "Pipeline at a glance."
+          : "Select a position. Review the candidate leaderboard."}
       </h2>
-      <p style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 32, fontSize: 17 }}>
-        Candidates are ranked by simulation fit score — updated automatically as
-        new candidates complete intake. Screening signal only; not a hiring decision.
+      <p style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 28, fontSize: 17 }}>
+        {tab === "overview"
+          ? "Snapshot across all your open positions and the candidate pool."
+          : "Candidates are ranked by simulation fit score — updated automatically as new candidates complete intake. Screening signal only; not a hiring decision."}
       </p>
-      <hr className="rule-thick" style={{ margin: "0 0 32px" }} />
 
+      <Tabs value={tab} onChange={changeTab} items={TABS} />
+
+      {error && (
+        <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
+      )}
+
+      {tab === "overview" && (
+        <OverviewTab
+          companies={companyList}
+          seedCount={seedCount}
+          onPick={selectPositionAndShow}
+          onCreate={openNewPosition}
+        />
+      )}
+
+      {tab === "positions" && (
+        <PositionsTab
+          nav={nav}
+          onCreate={openNewPosition}
+          companyList={companyList}
+          seedCount={seedCount}
+          selectedCompany={selectedCompany}
+          setSelectedCompany={setSelectedCompany}
+          company={company}
+        />
+      )}
+
+      {tab === "settings" && <SettingsTab nav={nav} />}
+
+      <NewPositionModal
+        open={newPositionOpen}
+        onClose={() => setNewPositionOpen(false)}
+        onPick={pickedTeam}
+      />
+    </main>
+  );
+}
+
+// ===========================================================================
+// Settings tab — Organizations management.
+// Roadmap 2 / PR #2d.2: org owns culture (mission, code_of_conduct, tagline);
+// each org owns one or more teams; positions live under teams.
+// ===========================================================================
+function SettingsTab({ nav }) {
+  const [orgs, setOrgs] = useState(null);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    organizations
+      .list()
+      .then(setOrgs)
+      .catch((e) => setError(e.message));
+  }, []);
+
+  async function createOrg() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const created = await organizations.create({
+        name: newName.trim(),
+        tagline: null,
+        mission: "",
+        code_of_conduct: "",
+      });
+      nav(`/manager/organizations/${created.id}`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (orgs === null && !error) {
+    return (
+      <div style={{ padding: "32px 0", color: COLORS.muted, fontStyle: "italic" }}>
+        Loading organizations…
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {error && (
+        <div style={{ color: COLORS.accent, fontStyle: "italic" }}>{error}</div>
+      )}
+
+      <section className="card">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div className="label-mono">Organizations</div>
+        </div>
+        <p style={{ color: COLORS.muted, fontSize: 14, margin: "0 0 18px" }}>
+          Mission and code of conduct live here — uploaded once per
+          organization, reused across every team and position. Click an
+          organization to manage its teams.
+        </p>
+
+        {(orgs || []).length === 0 ? (
+          <div style={{ color: COLORS.muted, fontStyle: "italic", marginBottom: 18 }}>
+            No organizations yet.
+          </div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", marginBottom: 18 }}>
+            {(orgs || []).map((o) => (
+              <li
+                key={o.id}
+                onClick={() => nav(`/manager/organizations/${o.id}`)}
+                style={{
+                  padding: "12px 4px",
+                  borderTop: `1px solid ${COLORS.rule}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>
+                    {o.name}
+                  </div>
+                  {o.tagline && (
+                    <div style={{ color: COLORS.muted, fontSize: 13 }}>{o.tagline}</div>
+                  )}
+                </div>
+                <span className="label-mono" style={{ fontSize: 11, color: COLORS.ink }}>
+                  manage →
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <input
+            className="ed"
+            value={newName}
+            placeholder="New organization name"
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createOrg();
+            }}
+          />
+          <button
+            className="ghost"
+            onClick={createOrg}
+            disabled={creating || !newName.trim()}
+            style={{ padding: "12px 18px", whiteSpace: "nowrap" }}
+          >
+            {creating ? "Creating…" : "+ New organization"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Overview tab — KPI strip + open positions list
+// ===========================================================================
+function OverviewTab({ companies: companyList, seedCount, onPick, onCreate }) {
+  const open = companyList.filter((c) => c.is_open !== false);
+  const closed = companyList.length - open.length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <Stat label="Open positions" value={open.length} />
+        <Stat label="Total positions" value={companyList.length} />
+        <Stat label="Closed" value={closed} muted />
+        <Stat label="Candidate pool" value={seedCount ?? "—"} />
+      </div>
+
+      <section className="card">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div className="label-mono">Open positions</div>
+          <button
+            className="ghost"
+            onClick={onCreate}
+            style={{ padding: "8px 14px", fontSize: 11 }}
+          >
+            + New Position
+          </button>
+        </div>
+        {open.length === 0 ? (
+          <p style={{ color: COLORS.muted, fontSize: 14, fontStyle: "italic" }}>
+            No open positions yet — click "+ New position" to set one up.
+          </p>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+            {open.map((c) => (
+              <li
+                key={c.id}
+                onClick={() => onPick(c.id)}
+                style={{
+                  padding: "12px 4px",
+                  borderTop: `1px solid ${COLORS.rule}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 500 }}>
+                    {c.name}
+                  </div>
+                  <div style={{ color: COLORS.muted, fontSize: 13 }}>{c.role}</div>
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 10,
+                    color: COLORS.muted,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.role_family?.replace(/_/g, " ")}
+                  {c.target_seniority && ` · ${c.target_seniority}`}
+                  <span style={{ marginLeft: 12, color: COLORS.ink }}>view →</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value, muted = false }) {
+  return (
+    <div
+      style={{
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.rule}`,
+        padding: "16px 20px",
+      }}
+    >
+      <div className="label-mono" style={{ marginBottom: 6 }}>{label}</div>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 36,
+          fontWeight: 500,
+          lineHeight: 1,
+          color: muted ? COLORS.muted : COLORS.ink,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Positions tab — original positions grid + leaderboard
+// ===========================================================================
+function PositionsTab({
+  nav,
+  onCreate,
+  companyList,
+  seedCount,
+  selectedCompany,
+  setSelectedCompany,
+  company,
+}) {
+  return (
+    <>
       {/* ── Positions grid ──────────────────────────────────────────────────── */}
       <div
         style={{
@@ -93,10 +432,10 @@ export default function ManagerDashboard() {
         </div>
         <button
           className="ghost"
-          onClick={() => nav("/manager/templates")}
+          onClick={onCreate}
           style={{ padding: "8px 14px" }}
         >
-          + New position
+          + New Position
         </button>
       </div>
 
@@ -126,56 +465,6 @@ export default function ManagerDashboard() {
         )}
       </div>
 
-      {/* ── Action bar (shown once a position is selected) ──────────────────── */}
-      {selectedCompany && (
-        <div
-          className="card"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            marginBottom: 32,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="label-mono" style={{ marginBottom: 4 }}>Selected position</div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500 }}>
-              {company?.name}
-            </div>
-            <div style={{ color: COLORS.muted, fontSize: 14 }}>{company?.role}</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/companies/${selectedCompany}/team`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Team
-            </button>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/companies/${selectedCompany}/scenarios`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Scenarios
-            </button>
-            <button
-              className="ghost"
-              onClick={() => nav(`/manager/templates/${selectedCompany}`)}
-              style={{ padding: "14px 20px" }}
-            >
-              Edit position
-            </button>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
-      )}
-
       {/* ── Leaderboard ─────────────────────────────────────────────────────── */}
       {selectedCompany ? (
         <PositionLeaderboard companyId={selectedCompany} />
@@ -192,7 +481,7 @@ export default function ManagerDashboard() {
           Select a position above to see its candidate leaderboard.
         </div>
       )}
-    </main>
+    </>
   );
 }
 
@@ -241,21 +530,15 @@ function PositionCard({ company, selected, onSelect, onEdit, onViewTeam, onViewS
           </div>
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-        <button
-          className="ghost"
-          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
-          onClick={onViewTeam}
-        >
-          Team
-        </button>
-        <button
-          className="ghost"
-          style={{ padding: "4px 10px", fontSize: 11, whiteSpace: "nowrap" }}
-          onClick={onEdit}
-        >
-          Edit
-        </button>
+      <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+        <KebabMenu
+          ariaLabel={`Actions for ${company.name}`}
+          items={[
+            { label: "Team", onClick: onViewTeam },
+            { label: "Scenarios", onClick: onViewScenarios },
+            { label: "Edit", onClick: onEdit },
+          ]}
+        />
       </div>
     </div>
   );

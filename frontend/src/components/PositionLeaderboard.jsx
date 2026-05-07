@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { companies, matches } from "../api.js";
-import FitProfileV2 from "./FitProfileV2.jsx";
+import FitProfileV3 from "./FitProfileV3.jsx";
 import { GeneratingScreen } from "./Widgets.jsx";
 
 const POLL_INTERVAL_MS = 5000;
@@ -282,7 +282,40 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
           {row.band}
         </div>
 
-        {/* Score pill */}
+        {/* PR #2d.3 — dual-score columns. Skills column hides when null
+            (position has no required_skills configured). */}
+        {row.skills_fit != null && (
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 11,
+              color: COLORS.muted,
+              minWidth: 56,
+              textAlign: "right",
+            }}
+            title="Skills fit"
+          >
+            <div style={{ fontSize: 9, letterSpacing: "0.1em" }}>SKILLS</div>
+            <div style={{ fontSize: 14, color: COLORS.ink }}>{row.skills_fit}</div>
+          </div>
+        )}
+        {row.behaviour_fit != null && (
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 11,
+              color: COLORS.muted,
+              minWidth: 64,
+              textAlign: "right",
+            }}
+            title="Behaviour fit"
+          >
+            <div style={{ fontSize: 9, letterSpacing: "0.1em" }}>BEHAVIOUR</div>
+            <div style={{ fontSize: 14, color: COLORS.ink }}>{row.behaviour_fit}</div>
+          </div>
+        )}
+
+        {/* Overall score pill */}
         <div
           style={{
             fontFamily: FONT_MONO,
@@ -292,6 +325,7 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
             minWidth: 44,
             textAlign: "right",
           }}
+          title="Overall fit"
         >
           {row.overall_score}
         </div>
@@ -310,8 +344,17 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
             background: "#fafafa",
           }}
         >
-          <FitProfileV2
+          <FitProfileV3
             report={{ ...row.report, matchId: row.match_id }}
+            candidate={{
+              id: row.candidate_id,
+              display_name: row.display_name,
+              cv_path: row.cv_path,
+              linkedin_url: row.linkedin_url,
+              github_url: row.github_url,
+              portfolio_url: row.portfolio_url,
+              profile_accuracy_score: row.profile_accuracy_score || 0,
+            }}
             criteriaIndex={criteriaIndex}
           />
         </div>

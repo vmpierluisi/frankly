@@ -44,6 +44,8 @@ def aggregate_fit_profile(
     role: str = "",
     baseline_report: dict[str, Any] | None = None,
     audit_extra: dict[str, Any] | None = None,
+    required_skills: list[dict[str, Any]] | None = None,
+    capability_ledger: dict | None = None,
 ) -> dict[str, Any]:
     """Aggregate rollout scores into a FitProfile v2 dict.
 
@@ -102,14 +104,29 @@ def aggregate_fit_profile(
         }
 
     # -----------------------------------------------------------------------
-    # Overall score — weighted mean of per-dimension means
+    # Dual-score (PR #2d.3):
+    #   * behaviour_fit = weighted mean of per-criterion means (the simulation)
+    #   * skills_fit    = required_skills × candidate capability ledger
+    #   * overall       = average of the two (or behaviour alone when no
+    #                     required_skills are configured)
+    # No thresholds, no flags — both numbers always shown to recruiters.
     # -----------------------------------------------------------------------
     weighted_sum = 0.0
     for key, df in dimensional_fit.items():
         mean = df.get("mean")
         if mean is not None:
             weighted_sum += mean * weights.get(key, 0.0)
-    overall = int(round(max(0.0, min(100.0, weighted_sum / total_weight))))
+    behaviour_fit = int(round(max(0.0, min(100.0, weighted_sum / total_weight))))
+
+    from .skills_fit import compute_skills_fit  # local import (no circular)
+    skills_fit_payload = compute_skills_fit(required_skills, capability_ledger)
+    skills_fit = skills_fit_payload["score"] if skills_fit_payload else None
+
+    if skills_fit is None:
+        overall = behaviour_fit
+    else:
+        overall = int(round((behaviour_fit + skills_fit) / 2))
+
     band, band_note = _band_for(overall)
 
     # -----------------------------------------------------------------------
@@ -238,6 +255,10 @@ def aggregate_fit_profile(
         "rolloutSummaries": rollout_summaries,
         "confidenceSignals": confidence_signals,
         "auditTrailV2": audit_trail_v2,
+        # PR #2d.3 — dual score
+        "behaviourFit": behaviour_fit,
+        "skillsFit": skills_fit,
+        "skillsFitDetails": skills_fit_payload,
     }
     if baseline_comparison is not None:
         profile["baselineComparison"] = baseline_comparison

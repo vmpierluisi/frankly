@@ -372,6 +372,12 @@ async def run_match(
     if aborted:
         audit_extra["aborted"] = "cost_ceiling_or_wall_timeout"
 
+    # PR #2d.3 — feed dual-score inputs (required_skills + candidate's
+    # capability_ledger) to the aggregator so it can compute skills_fit
+    # alongside behaviour_fit.
+    verified_for_aggr = (
+        persona.get("verified_profile") if isinstance(persona, dict) else None
+    )
     fit_profile = aggregate_fit_profile(
         all_rollouts,
         list(all_scores),
@@ -382,6 +388,8 @@ async def run_match(
         role=company.role,
         baseline_report=baseline_report,
         audit_extra=audit_extra,
+        required_skills=list(getattr(company, "required_skills", []) or []),
+        capability_ledger=(verified_for_aggr or {}).get("capability_ledger"),
     )
 
     # ---- ProofLayer — attest per-dimension scores then build proof chain ----

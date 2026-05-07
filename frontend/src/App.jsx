@@ -12,6 +12,8 @@ import ScenarioLibraryPage from "./pages/ScenarioLibraryPage.jsx";
 import SyntheticTeamPage from "./pages/SyntheticTeamPage.jsx";
 import TemplateSetup from "./pages/TemplateSetup.jsx";
 import TranscriptViewer from "./pages/TranscriptViewer.jsx";
+import OrganizationSettings from "./pages/OrganizationSettings.jsx";
+import TeamDetail from "./pages/TeamDetail.jsx";
 import Login from "./pages/Login.jsx";
 
 // Wire the session getter into the API module once at startup.
@@ -104,6 +106,22 @@ export default function App() {
         />
 
         <Route
+          path="/manager/organizations/:orgId"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <OrganizationSettings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/manager/teams/:teamId"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <TeamDetail />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/manager/matches/:matchId/rollouts/:rolloutId"
           element={
             <RequireAuth auth={auth} role="manager">
@@ -185,7 +203,7 @@ function Masthead({ auth }) {
             letterSpacing: "-0.01em",
           }}
         >
-          Parallax<span style={{ color: COLORS.accent }}>.</span>
+          frankly<span style={{ color: COLORS.accent }}>.</span>
         </div>
       </div>
       <div className="nav-bar">

@@ -40,6 +40,7 @@ class _StubCriterion:
 
 class _StubCompany:
     id = "meridian-capital"
+    team_id = "team-meridian"
     name = "Meridian Capital"
     role = "Associate, Private Credit"
     tagline = "Patience as a competitive edge."
@@ -239,7 +240,7 @@ async def test_synthesize_required_fields_set():
         result = await synthesize(company, budget=budget, n=2)
 
     for t in result:
-        assert t.company_id == company.id
+        assert t.team_id == company.team_id
         assert t.name != ""
         assert t.role_on_team != ""
         assert t.seniority in ("junior", "mid", "senior", "lead")
