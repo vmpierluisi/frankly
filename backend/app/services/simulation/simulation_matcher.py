@@ -29,6 +29,17 @@ from .rollout import execute_rollout
 from .rollout_logger import log_event
 from ...config import settings
 
+
+class NoRolloutsScored(RuntimeError):
+    """Raised by run_match when zero rollouts produced any RolloutScore rows.
+
+    Without scores the aggregator produces a meaningless 0/0/0 fit profile,
+    and callers should mark the Match as ``failed`` rather than ``succeeded``
+    so demos and analytics aren't polluted with phantom-success entries.
+    Roadmap 2 / PR #2d.4.a — fixes the bug where transient infra failures
+    silently produced "succeeded" matches with all-zero scores.
+    """
+
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
     from ...models import Candidate, Company, MomentOfTruth, Rollout, RolloutScore
@@ -323,9 +334,33 @@ async def run_match(
     rollout_ids = [r.id for r in all_rollouts]
     all_scores: list["RolloutScore"] = []
     if rollout_ids:
+        # Make sure RolloutScore rows added by execute_rollout are visible to
+        # the select below — sessions configured with ``autoflush=False``
+        # (incl. our test fixtures) won't surface uncommitted writes otherwise.
+        db.flush()
         all_scores = db.execute(
             select(RolloutScore).where(RolloutScore.rollout_id.in_(rollout_ids))
         ).scalars().all()
+
+    # PR #2d.4.a — refuse to call this match "succeeded" if zero criteria
+    # judges scored anything. Fidelity-judge rows alone don't count because
+    # they don't drive overall_fit. Without at least one criteria score the
+    # aggregator returns 0/0/0 — that masks upstream failures and pollutes
+    # leaderboards with phantom-success rows.
+    criteria_scores = [
+        s for s in all_scores
+        if s.dimension_key != "persona_fidelity" and s.score is not None
+    ]
+    if not criteria_scores:
+        await log_event(
+            match_id, None, "match_aborted_no_scores",
+            {"total_rollouts": total, "completed_rollouts": len(all_rollouts)},
+            db=db,
+        )
+        raise NoRolloutsScored(
+            f"All {total} rollouts failed or produced no criteria scores; "
+            "marking match as failed rather than succeeded with zero score."
+        )
 
     # ---- Baseline matcher (runs in parallel with rollouts conceptually;
     #      here we run it after since we need persona which is ready) ---------

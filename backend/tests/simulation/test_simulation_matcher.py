@@ -327,3 +327,39 @@ async def test_run_match_falls_back_to_legacy_persona(db_session):
         )
 
     assert profile["version"] == "v2"
+
+
+@pytest.mark.asyncio
+async def test_run_match_raises_when_no_criteria_scores(db_session):
+    """Roadmap 2 / PR #2d.4.a — refuse to call a match 'succeeded' when zero
+    rollouts produced criteria scores. Without this guard, transient infra
+    failures silently produced 0/0/0 'succeeded' matches that polluted
+    leaderboards and analytics.
+    """
+    from app.services.simulation.simulation_matcher import NoRolloutsScored
+
+    # Patch the criteria judge to return empty dimension_scores so no
+    # RolloutScore rows are persisted.
+    empty_judge = {
+        "dimension_scores": {},
+        "transcript_summary": "",
+        "judge_notes": "",
+    }
+    with patch(
+        "app.services.simulation.agent_runtime.tracked_chat_json",
+        new=AsyncMock(return_value=_STUB_AGENT_TURN),
+    ), patch(
+        "app.services.simulation.judge.tracked_chat_json",
+        new=AsyncMock(return_value=empty_judge),
+    ), patch(
+        "app.services.simulation.simulation_matcher.baseline_run_match",
+        new=AsyncMock(return_value=_BASELINE_RESP),
+    ):
+        with pytest.raises(NoRolloutsScored):
+            await run_match(
+                match_id="match-empty",
+                candidate=_StubCandidate(),
+                company=_StubCompany(),
+                db=db_session,
+                k_per_scenario=1,
+            )
