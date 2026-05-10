@@ -8,6 +8,7 @@ import VerifiedProfileView from "./VerifiedProfileView.jsx";
 import BaselineCompareStrip from "./BaselineCompareStrip.jsx";
 import RolloutSummaryCard from "./RolloutSummaryCard.jsx";
 import { ProfileAccuracyChip } from "./ProfileAccuracyRing.jsx";
+import ScenarioRadar from "./ScenarioRadar.jsx";
 import { formatCriterion } from "./Widgets.jsx";
 
 /**
@@ -50,6 +51,8 @@ export default function FitProfileV3({
     skillsFitDetails = null,
     // PR #3 — peer percentile (null when too few peers).
     percentile = null,
+    // PR #3.5 — per-scenario aggregates for the radar.
+    scenarioAggregates = [],
   } = report;
   const displayName = companyName || company_name;
   const behaviourScore =
@@ -109,21 +112,7 @@ export default function FitProfileV3({
             skills={skillsScore}
           />
           {percentile && typeof percentile.percentile === "number" && (
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: 11,
-                letterSpacing: "0.1em",
-                color: COLORS.muted,
-                background: COLORS.cardBg,
-                border: `1px solid ${COLORS.rule}`,
-                padding: "4px 10px",
-              }}
-              title={`Compared against ${percentile.sample_size} other ${(percentile.role_family || "").replace(/_/g, " ")} candidates we've simulated.`}
-            >
-              Top {Math.max(1, 100 - percentile.percentile)}% of{" "}
-              {(percentile.role_family || "peers").replace(/_/g, " ")}
-            </div>
+            <PercentileChip percentile={percentile} />
           )}
           <BaselineCompareStrip
             baselineComparison={baselineComparison}
@@ -181,6 +170,15 @@ export default function FitProfileV3({
             Skills match · {skillsFitDetails.score}/100
           </div>
           <SkillsBreakdown rows={skillsFitDetails.per_skill} />
+        </>
+      )}
+
+      {/* PR #3.5 — multi-scenario stress test radar. Hidden when fewer
+          than 3 scored scenarios (radar with 1-2 points is meaningless). */}
+      {Array.isArray(scenarioAggregates) && scenarioAggregates.length >= 3 && (
+        <>
+          <hr className="rule-thick" style={{ margin: "32px 0 24px" }} />
+          <ScenarioRadar scenarios={scenarioAggregates} />
         </>
       )}
 
@@ -665,6 +663,57 @@ function DualScoreHeadline({ overall, behaviour, skills }) {
     </div>
   );
 }
+
+// ===========================================================================
+// PercentileChip — peer-comparison framing.
+//
+// The raw ``percentile`` field is "share of peers below this candidate". So:
+//   * pct = 92  → very strong → "Top 8% of peers"
+//   * pct = 50  → median       → "50th percentile of peers"
+//   * pct = 12  → weak         → "Below 88% of peers"
+// We avoid "Top X%" for low performers because "Top 80%" reads as misleadingly
+// positive.
+// ===========================================================================
+function PercentileChip({ percentile }) {
+  const pct = percentile.percentile;
+  const peers = (percentile.role_family || "peers").replace(/_/g, " ");
+  let text;
+  if (pct >= 75) {
+    text = `Top ${Math.max(1, 100 - pct)}% of ${peers}`;
+  } else if (pct <= 25) {
+    text = `Below ${100 - pct}% of ${peers}`;
+  } else {
+    // Ordinal suffix for 26–74.
+    const suffix =
+      pct % 100 >= 11 && pct % 100 <= 13
+        ? "th"
+        : pct % 10 === 1
+        ? "st"
+        : pct % 10 === 2
+        ? "nd"
+        : pct % 10 === 3
+        ? "rd"
+        : "th";
+    text = `${pct}${suffix} percentile of ${peers}`;
+  }
+  return (
+    <div
+      style={{
+        fontFamily: FONT_MONO,
+        fontSize: 11,
+        letterSpacing: "0.1em",
+        color: COLORS.muted,
+        background: COLORS.cardBg,
+        border: `1px solid ${COLORS.rule}`,
+        padding: "4px 10px",
+      }}
+      title={`Compared against ${percentile.sample_size} other ${peers} candidates we've simulated.`}
+    >
+      {text}
+    </div>
+  );
+}
+
 
 function SubScore({ label, value }) {
   return (

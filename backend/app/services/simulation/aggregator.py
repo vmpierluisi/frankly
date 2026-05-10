@@ -175,6 +175,58 @@ def aggregate_fit_profile(
         })
 
     # -----------------------------------------------------------------------
+    # Scenario aggregates — per-scenario score for the multi-scenario radar.
+    # PR #3.5. Each scenario contributes one weighted-mean score across its
+    # rollouts × its scoring dimensions, weighted by criterion weight (same
+    # rule that produces behaviour_fit, scoped to one scenario).
+    # -----------------------------------------------------------------------
+    scenario_aggregates: list[dict[str, Any]] = []
+    by_scenario: dict[str, list["Rollout"]] = {}
+    for rollout in rollouts:
+        sid = rollout.scenario_id or ""
+        if not sid:
+            continue
+        by_scenario.setdefault(sid, []).append(rollout)
+
+    for sid, scenario_rollouts in by_scenario.items():
+        per_dim_means: dict[str, list[float]] = {}
+        for r in scenario_rollouts:
+            for key, s in scores_by_rollout.get(r.id, {}).items():
+                if key == "persona_fidelity" or s.score is None:
+                    continue
+                per_dim_means.setdefault(key, []).append(float(s.score))
+        if not per_dim_means:
+            continue
+        weighted = 0.0
+        wsum = 0.0
+        for key, vals in per_dim_means.items():
+            w = weights.get(key, 0.0)
+            if w <= 0:
+                continue
+            weighted += (sum(vals) / len(vals)) * w
+            wsum += w
+        score = int(round(weighted / wsum)) if wsum > 0 else None
+        # Title comes from any rollout's final_state if scenario_engine
+        # stamped it there, otherwise from the scenario summary cache.
+        title = ""
+        for r in scenario_rollouts:
+            t = (r.final_state or {}).get("scenario_title")
+            if t:
+                title = t
+                break
+        n_rollouts = len(scenario_rollouts)
+        scenario_aggregates.append({
+            "scenarioId": sid,
+            "title": title,
+            "score": score,
+            "nRollouts": n_rollouts,
+            "perDim": {k: round(sum(v) / len(v), 1) for k, v in per_dim_means.items()},
+        })
+
+    # Deterministic order for stable radar rendering.
+    scenario_aggregates.sort(key=lambda s: (s.get("title") or s["scenarioId"]))
+
+    # -----------------------------------------------------------------------
     # Confidence signals
     # -----------------------------------------------------------------------
     per_criterion_std = {
@@ -264,6 +316,8 @@ def aggregate_fit_profile(
         "behaviourFit": behaviour_fit,
         "skillsFit": skills_fit,
         "skillsFitDetails": skills_fit_payload,
+        # PR #3.5 — per-scenario aggregate scores for the radar chart.
+        "scenarioAggregates": scenario_aggregates,
     }
     if baseline_comparison is not None:
         profile["baselineComparison"] = baseline_comparison
