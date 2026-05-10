@@ -22,6 +22,7 @@ from .fidelity_judge import (
     FIDELITY_RERUN_THRESHOLD,
     score_persona_fidelity,
 )
+from .highlight_reel import generate_highlight_reel
 from .judge import score_rollout
 from .rollout_logger import log_event
 from .scenario_engine import prepare_rollout
@@ -203,6 +204,26 @@ async def execute_rollout(
 
     # Store transcript summary for aggregator
     rollout.final_state = {**rollout.final_state, "transcript_summary": judge_result.transcript_summary}
+
+    # --- Highlight reel (PR #3) -------------------------------------------
+    # Recruiter-readable 2-3 sentence narrative of the rollout, with
+    # pointers to the most informative turns. Cheap, optional — silently
+    # dropped on failure (transcript_summary remains as fallback).
+    if status == "completed":
+        try:
+            reel = await generate_highlight_reel(
+                scenario=scenario,
+                transcript=world.turn_history,
+                score_rows=list(judge_result.rows),
+                budget=budget,
+            )
+            if reel:
+                rollout.final_state = {
+                    **rollout.final_state,
+                    "highlight_reel": reel,
+                }
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("highlight_reel skipped: %s", exc)
 
     # --- Persona fidelity (PR #1.6) ---------------------------------------
     # Cost optimization: fidelity is largely a function of prompt setup

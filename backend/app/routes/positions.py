@@ -188,8 +188,37 @@ def get_leaderboard(
         )
     ).all()
 
+    # PR #3 — recompute peer percentiles at serve time using the current peer
+    # pool. Avoids the chicken-and-egg where the first-scored match had no
+    # peers and the last had all of them. Percentile written into the
+    # response payload only; the stored report is unchanged.
+    peer_scores: list[int] | None = None
+    if company.role_family:
+        peer_scores = db.execute(
+            select(models.Match.overall_score)
+            .join(models.Position, models.Position.id == models.Match.position_id)
+            .where(
+                models.Match.status == "succeeded",
+                models.Position.role_family == company.role_family,
+            )
+        ).scalars().all()
+
     rows: list[schemas.LeaderboardRow] = []
     for match, candidate in matches:
+        report = dict(match.report or {})
+        if peer_scores and match.status == "succeeded":
+            # Exclude this candidate's own score when ranking themselves.
+            others = [s for s in peer_scores if s != match.overall_score] + [
+                s for s in peer_scores if s == match.overall_score
+            ][1:]  # drop one occurrence
+            if len(others) >= 5:
+                lower = sum(1 for s in others if (s or 0) < match.overall_score)
+                pct = int(round(100 * lower / len(others)))
+                report["percentile"] = {
+                    "percentile": pct,
+                    "sample_size": len(others),
+                    "role_family": company.role_family,
+                }
         rows.append(
             schemas.LeaderboardRow(
                 match_id=match.id,
@@ -199,7 +228,7 @@ def get_leaderboard(
                 status=match.status,
                 overall_score=match.overall_score,
                 band=match.band,
-                report=match.report or {},
+                report=report,
                 started_at=match.started_at,
                 finished_at=match.finished_at,
                 error_message=match.error_message,

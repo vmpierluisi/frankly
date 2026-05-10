@@ -48,6 +48,8 @@ export default function FitProfileV3({
     behaviourFit,
     skillsFit,
     skillsFitDetails = null,
+    // PR #3 — peer percentile (null when too few peers).
+    percentile = null,
   } = report;
   const displayName = companyName || company_name;
   const behaviourScore =
@@ -106,6 +108,23 @@ export default function FitProfileV3({
             behaviour={behaviourScore}
             skills={skillsScore}
           />
+          {percentile && typeof percentile.percentile === "number" && (
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 11,
+                letterSpacing: "0.1em",
+                color: COLORS.muted,
+                background: COLORS.cardBg,
+                border: `1px solid ${COLORS.rule}`,
+                padding: "4px 10px",
+              }}
+              title={`Compared against ${percentile.sample_size} other ${(percentile.role_family || "").replace(/_/g, " ")} candidates we've simulated.`}
+            >
+              Top {Math.max(1, 100 - percentile.percentile)}% of{" "}
+              {(percentile.role_family || "peers").replace(/_/g, " ")}
+            </div>
+          )}
           <BaselineCompareStrip
             baselineComparison={baselineComparison}
             simulationOverallScore={overallScore}

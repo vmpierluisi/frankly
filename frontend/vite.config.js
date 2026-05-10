@@ -18,7 +18,7 @@ export default defineConfig({
     // The browser talks to Vite (same origin); Vite forwards to the backend.
     proxy: {
       "/candidates": backendUrl,
-      "/companies": backendUrl,
+      "/positions": backendUrl,
       "/templates": backendUrl,
       "/matches": backendUrl,
       "/organizations": backendUrl,

@@ -159,14 +159,19 @@ def aggregate_fit_profile(
             for key, s in dim_scores.items()
             if s.score is not None
         }
-        headline = (rollout.final_state or {}).get("transcript_summary", "")
+        final_state = rollout.final_state or {}
+        headline = final_state.get("transcript_summary", "")
+        highlight = final_state.get("highlight_reel") or None
         rollout_summaries.append({
             "rolloutId": rollout.id,
             "scenarioId": rollout.scenario_id or "",
-            "scenarioTitle": (rollout.final_state or {}).get("scenario_title", ""),
+            "scenarioTitle": final_state.get("scenario_title", ""),
             "kIndex": rollout.rollout_index,
             "headline": headline,
             "scores": per_dim_scores,
+            # PR #3 — auto-generated recruiter-readable narrative.
+            # Always present even on legacy rollouts (null when missing).
+            "highlightReel": highlight,
         })
 
     # -----------------------------------------------------------------------

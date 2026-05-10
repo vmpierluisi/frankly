@@ -116,14 +116,14 @@ export const teams = {
 // ---------- Company endpoints (legacy: a Company is a Position) ----------
 export const positions = {
   list: () => request("/positions", { auth: true }),
-  get: (id) => request(`/companies/${id}`, { auth: true }),
+  get: (id) => request(`/positions/${id}`, { auth: true }),
   create: (payload) =>
     request("/positions", { method: "POST", body: payload, auth: true }),
   update: (id, payload) =>
-    request(`/companies/${id}`, { method: "PUT", body: payload, auth: true }),
+    request(`/positions/${id}`, { method: "PUT", body: payload, auth: true }),
   remove: (id) =>
-    request(`/companies/${id}`, { method: "DELETE", auth: true, raw: true }),
-  leaderboard: (id) => request(`/companies/${id}/leaderboard`, { auth: true }),
+    request(`/positions/${id}`, { method: "DELETE", auth: true, raw: true }),
+  leaderboard: (id) => request(`/positions/${id}/leaderboard`, { auth: true }),
 };
 
 // ---------- Templates (artifact parse + criteria extract) ----------
@@ -168,17 +168,17 @@ export const matches = {
 // ---------- Scenario library ----------
 export const scenarios = {
   list: (companyId) =>
-    request(`/companies/${companyId}/scenarios`, { auth: true }),
+    request(`/positions/${companyId}/scenarios`, { auth: true }),
   draft: (companyId) =>
-    request(`/companies/${companyId}/scenarios/draft`, { method: "POST", auth: true }),
+    request(`/positions/${companyId}/scenarios/draft`, { method: "POST", auth: true }),
   create: (companyId, payload) =>
-    request(`/companies/${companyId}/scenarios`, { method: "POST", body: payload, auth: true }),
+    request(`/positions/${companyId}/scenarios`, { method: "POST", body: payload, auth: true }),
   update: (companyId, scenarioId, payload) =>
-    request(`/companies/${companyId}/scenarios/${scenarioId}`, {
+    request(`/positions/${companyId}/scenarios/${scenarioId}`, {
       method: "PATCH", body: payload, auth: true,
     }),
   remove: (companyId, scenarioId) =>
-    request(`/companies/${companyId}/scenarios/${scenarioId}`, {
+    request(`/positions/${companyId}/scenarios/${scenarioId}`, {
       method: "DELETE", auth: true, raw: true,
     }),
 };
@@ -186,17 +186,17 @@ export const scenarios = {
 // ---------- Synthetic team ----------
 export const team = {
   list: (companyId) =>
-    request(`/companies/${companyId}/team`, { auth: true }),
+    request(`/positions/${companyId}/team`, { auth: true }),
   synthesize: (companyId) =>
-    request(`/companies/${companyId}/team/synthesize`, { method: "POST", auth: true }),
+    request(`/positions/${companyId}/team/synthesize`, { method: "POST", auth: true }),
   update: (companyId, teammateId, payload) =>
-    request(`/companies/${companyId}/team/${teammateId}`, {
+    request(`/positions/${companyId}/team/${teammateId}`, {
       method: "PATCH",
       body: payload,
       auth: true,
     }),
   remove: (companyId, teammateId) =>
-    request(`/companies/${companyId}/team/${teammateId}`, {
+    request(`/positions/${companyId}/team/${teammateId}`, {
       method: "DELETE",
       auth: true,
       raw: true,

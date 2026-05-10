@@ -119,6 +119,53 @@ def _candidate_label(candidate: "Candidate") -> str:
     return candidate.display_name or candidate.email or "Candidate"
 
 
+def _compute_percentile(
+    *,
+    db: "Session",
+    position_id: str,
+    candidate_id: str,
+    overall_score: int,
+) -> dict[str, Any] | None:
+    """Return ``{percentile: int, sample_size: int, role_family: str}`` or None.
+
+    "Percentile" is the share of *succeeded* same-role-family matches whose
+    overall_score is strictly lower than this candidate's — i.e. higher is
+    better, "top 12%" means percentile=88.
+
+    Returns ``None`` when there are too few peers (<5) to be meaningful.
+    """
+    from sqlalchemy import select
+    from ...models import Match, Position
+
+    position = db.get(Position, position_id)
+    role_family = getattr(position, "role_family", None)
+    if not role_family:
+        return None
+
+    # All succeeded matches under positions sharing the role_family,
+    # excluding the current candidate to avoid self-reference.
+    rows = db.execute(
+        select(Match.overall_score)
+        .join(Position, Position.id == Match.position_id)
+        .where(
+            Match.status == "succeeded",
+            Position.role_family == role_family,
+            Match.candidate_id != candidate_id,
+        )
+    ).scalars().all()
+
+    if len(rows) < 5:
+        return None
+
+    lower = sum(1 for s in rows if (s or 0) < overall_score)
+    pct = int(round(100 * lower / len(rows)))
+    return {
+        "percentile": pct,
+        "sample_size": len(rows),
+        "role_family": role_family,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Company data helpers
 # ---------------------------------------------------------------------------
@@ -446,6 +493,17 @@ async def run_match(
 
     proof = await get_proof_layer().build_proof_chain(fit_profile, all_rollouts)
     fit_profile["proofChain"] = proof
+
+    # ---- Percentile vs peers (PR #3) --------------------------------------
+    # "Top X% of {role_family} candidates we've simulated." Computed against
+    # every other succeeded match for positions in the same role_family,
+    # excluding the current candidate. Cheap single query.
+    fit_profile["percentile"] = _compute_percentile(
+        db=db,
+        position_id=company.id,
+        candidate_id=candidate.id,
+        overall_score=fit_profile["overallScore"],
+    )
 
     # Patch baseline delta into the BaselineComparison row now that we have it
     if baseline_report and fit_profile.get("baselineComparison"):

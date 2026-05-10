@@ -8,34 +8,134 @@ function scoreTick(score) {
   return COLORS.muted;
 }
 
+/**
+ * Roadmap 2 / PR #3 — Rollout card with optional highlight reel.
+ *
+ * When the backend attaches a ``highlight_reel`` to the rollout's
+ * ``final_state``, the card promotes the auto-generated one-liner +
+ * summary as the headline. Falls back to the judge's ``transcript_summary``
+ * for legacy rollouts produced before PR #3 shipped.
+ */
 export default function RolloutSummaryCard({ summary, onClick }) {
-  const { rolloutId, scenarioTitle, kIndex, headline, scores = {} } = summary;
+  const {
+    rolloutId,
+    scenarioTitle,
+    kIndex,
+    headline,
+    highlightReel,
+    scores = {},
+  } = summary;
   const scoreEntries = Object.entries(scores);
+
+  const oneLiner = highlightReel?.one_liner?.trim();
+  const reelBody = highlightReel?.summary?.trim();
+  const fallbackBody = headline?.trim();
+  const body = reelBody || fallbackBody || "";
+  const isAutoHighlight = !!reelBody;
 
   return (
     <div
       className="card"
       onClick={() => onClick(rolloutId)}
-      style={{ cursor: "pointer", minWidth: 220, maxWidth: 280, flex: "0 0 auto", transition: "box-shadow 0.15s" }}
-      onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"}
-      onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+      style={{
+        cursor: "pointer",
+        minWidth: 240,
+        maxWidth: 320,
+        flex: "0 0 auto",
+        transition: "box-shadow 0.15s",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)")
+      }
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
-      <div className="label-mono" style={{ marginBottom: 8 }}>
-        Rollout #{kIndex} · {scenarioTitle}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <span className="label-mono">
+          Rollout #{kIndex}
+          {scenarioTitle ? ` · ${scenarioTitle}` : ""}
+        </span>
+        {isAutoHighlight && (
+          <span
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              padding: "2px 6px",
+              border: `1px solid ${COLORS.rule}`,
+              color: COLORS.muted,
+            }}
+            title="Auto-generated highlight reel"
+          >
+            highlight
+          </span>
+        )}
       </div>
-      {headline ? (
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontStyle: "italic", lineHeight: 1.45, marginBottom: 12, minHeight: 48 }}>
-          {headline.length > 120 ? headline.slice(0, 117) + "…" : headline}
+
+      {oneLiner && (
+        <div
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 17,
+            fontWeight: 500,
+            lineHeight: 1.35,
+            marginBottom: 8,
+            color: COLORS.ink,
+          }}
+        >
+          {oneLiner}
+        </div>
+      )}
+
+      {body ? (
+        <div
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 14,
+            fontStyle: isAutoHighlight ? "normal" : "italic",
+            color: isAutoHighlight ? COLORS.ink : COLORS.muted,
+            lineHeight: 1.45,
+            marginBottom: 12,
+            minHeight: 56,
+          }}
+        >
+          {body.length > 220 ? body.slice(0, 217) + "…" : body}
         </div>
       ) : (
-        <div style={{ minHeight: 48, marginBottom: 12 }} />
+        <div style={{ minHeight: 56, marginBottom: 12 }} />
       )}
+
       {scoreEntries.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            marginTop: "auto",
+          }}
+        >
           {scoreEntries.map(([key, score]) => (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: scoreTick(score) }} />
-              <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: COLORS.muted }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: scoreTick(score),
+                }}
+              />
+              <span
+                style={{ fontFamily: FONT_MONO, fontSize: 10, color: COLORS.muted }}
+              >
                 {Math.round(score)}
               </span>
             </div>
