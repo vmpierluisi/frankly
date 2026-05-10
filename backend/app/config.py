@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # Skip JWT verification in local dev (never set true in compose/prod).
     dev_mode: bool = False
 
+    # --- Resend (transactional email — PR #4) ---
+    resend_api_key: str = ""
+    resend_from_email: str = "frankly <onboarding@resend.dev>"
+    frontend_url: str = "http://localhost:5173"
+
     # --- CORS ---
     cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

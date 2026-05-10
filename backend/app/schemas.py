@@ -601,6 +601,67 @@ class BaselineComparisonOut(BaseModel):
 
 
 # ----------------------------------------------------------------------------
+# Roadmap 2 / PR #4 — interviews + notifications
+# ----------------------------------------------------------------------------
+class InterviewProposeIn(BaseModel):
+    match_id: str
+    proposed_slots: list[str] = Field(default_factory=list, min_length=1, max_length=5)
+
+
+class InterviewAcceptIn(BaseModel):
+    selected_slot: str
+    message: str | None = None
+
+
+class InterviewDeclineIn(BaseModel):
+    message: str | None = None
+
+
+class InterviewCounterIn(BaseModel):
+    counter_slots: list[str] = Field(default_factory=list, min_length=1, max_length=5)
+    message: str | None = None
+
+
+class InterviewOut(BaseModel):
+    """Recruiter-side view — vacancy details always visible."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    match_id: str
+    candidate_id: str
+    position_id: str
+    recruiter_email: str
+    proposed_slots: list[str]
+    selected_slot: str | None = None
+    counter_slots: list[str]
+    candidate_message: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    candidate_display_name: str | None = None
+    candidate_email: str | None = None
+    position_name: str | None = None
+    position_role: str | None = None
+    organization_name: str | None = None
+
+
+class CandidateInterviewOut(InterviewOut):
+    """Candidate-side view — vacancy fields are the vacancy-reveal: this is
+    the first surface where a candidate sees position_name / role / org."""
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_kind: str
+    type: str
+    payload: dict[str, Any]
+    status: str
+    created_at: datetime
+
+
+# ----------------------------------------------------------------------------
 # Misc
 # ----------------------------------------------------------------------------
 class HealthOut(BaseModel):

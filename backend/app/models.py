@@ -556,6 +556,67 @@ def _block_rollout_log_delete(mapper, connection, target):
 # ----------------------------------------------------------------------------
 # Admin — validation runs
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# Roadmap 2 / PR #4 — interview scheduling + notifications.
+# Interview rows are the scheduling thread between a manager and a candidate
+# for a specific match. Notifications are the bell-icon feed routed by
+# user_kind (candidate vs manager) — managers live as email-only identities
+# (no managers table), so they are addressed by recipient_email.
+# ----------------------------------------------------------------------------
+class Interview(Base):
+    __tablename__ = "interviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    match_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("matches.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    candidate_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    position_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("positions.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    recruiter_email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
+
+    # ISO 8601 strings; we never bind to a TZ here. UI is responsible for
+    # rendering against the viewer's local timezone.
+    proposed_slots: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    selected_slot: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    counter_slots: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    candidate_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # proposed | accepted | declined | rescheduled | completed
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="proposed", index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    candidate: Mapped[Candidate] = relationship("Candidate")
+    position: Mapped[Position] = relationship("Position")
+    match: Mapped[Match] = relationship("Match")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # "candidate" | "manager"
+    user_kind: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    candidate_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    recipient_email: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
+
+    # interview_invite | interview_accepted | interview_declined | interview_counter
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    # unread | read | dismissed
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="unread", index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class ValidationRun(Base):
     __tablename__ = "validation_runs"
 

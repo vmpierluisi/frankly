@@ -7,6 +7,7 @@ import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 import Tabs from "../components/Tabs.jsx";
 import KebabMenu from "../components/KebabMenu.jsx";
 import NewPositionModal from "../components/NewPositionModal.jsx";
+import NotificationBell from "../components/NotificationBell.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -90,7 +91,17 @@ export default function ManagerDashboard() {
 
   return (
     <main className="container" style={{ maxWidth: 1280 }}>
-      <div className="label-mono" style={{ marginBottom: 12 }}>Manager · Dashboard</div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <div className="label-mono">Manager · Dashboard</div>
+        <NotificationBell />
+      </div>
       <h2
         style={{
           fontFamily: FONT_DISPLAY,
