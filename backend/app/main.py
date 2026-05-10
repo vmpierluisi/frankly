@@ -12,7 +12,9 @@ from .db import SessionLocal, init_db
 from .routes import (
     admin,
     candidates,
+    interviews,
     matches,
+    notifications,
     organizations,
     positions,
     scenarios,
@@ -88,3 +90,5 @@ app.include_router(team.router)
 app.include_router(scenarios.router)
 app.include_router(organizations.router)
 app.include_router(teams.router)
+app.include_router(interviews.router)
+app.include_router(notifications.router)

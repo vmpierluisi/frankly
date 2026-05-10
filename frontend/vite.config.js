@@ -25,6 +25,8 @@ export default defineConfig({
       "/teams": backendUrl,
       "/admin": backendUrl,
       "/health": backendUrl,
+      "/interviews": backendUrl,
+      "/notifications": backendUrl,
     },
   },
 });

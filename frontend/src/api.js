@@ -203,4 +203,48 @@ export const team = {
     }),
 };
 
+// ---------- Interviews (Roadmap 2 / PR #4) ----------
+export const interviews = {
+  propose: (match_id, proposed_slots) =>
+    request("/interviews", {
+      method: "POST",
+      body: { match_id, proposed_slots },
+      auth: true,
+    }),
+  listForManager: (candidate_id) => {
+    const qs = candidate_id ? `?candidate_id=${encodeURIComponent(candidate_id)}` : "";
+    return request(`/interviews${qs}`, { auth: true });
+  },
+  listMine: () => request("/interviews/me", { auth: true }),
+  accept: (id, selected_slot, message) =>
+    request(`/interviews/${id}/accept`, {
+      method: "POST",
+      body: { selected_slot, message: message || null },
+      auth: true,
+    }),
+  decline: (id, message) =>
+    request(`/interviews/${id}/decline`, {
+      method: "POST",
+      body: { message: message || null },
+      auth: true,
+    }),
+  counter: (id, counter_slots, message) =>
+    request(`/interviews/${id}/counter`, {
+      method: "POST",
+      body: { counter_slots, message: message || null },
+      auth: true,
+    }),
+};
+
+// ---------- Notifications ----------
+export const notifications = {
+  list: () => request("/notifications", { auth: true }),
+  markRead: (id) =>
+    request(`/notifications/${id}/read`, { method: "POST", auth: true }),
+  markAllRead: () =>
+    request("/notifications/read-all", { method: "POST", auth: true }),
+  dismiss: (id) =>
+    request(`/notifications/${id}/dismiss`, { method: "POST", auth: true }),
+};
+
 export const API_BASE = BASE;

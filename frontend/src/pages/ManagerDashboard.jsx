@@ -7,6 +7,7 @@ import PositionLeaderboard from "../components/PositionLeaderboard.jsx";
 import Tabs from "../components/Tabs.jsx";
 import KebabMenu from "../components/KebabMenu.jsx";
 import NewPositionModal from "../components/NewPositionModal.jsx";
+import NotificationBell from "../components/NotificationBell.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -90,7 +91,9 @@ export default function ManagerDashboard() {
 
   return (
     <main className="container" style={{ maxWidth: 1280 }}>
-      <div className="label-mono" style={{ marginBottom: 12 }}>Manager · Dashboard</div>
+      <div className="label-mono" style={{ marginBottom: 12 }}>
+        Manager · Dashboard
+      </div>
       <h2
         style={{
           fontFamily: FONT_DISPLAY,
@@ -111,7 +114,12 @@ export default function ManagerDashboard() {
           : "Candidates are ranked by simulation fit score — updated automatically as new candidates complete intake. Screening signal only; not a hiring decision."}
       </p>
 
-      <Tabs value={tab} onChange={changeTab} items={TABS} />
+      <div style={{ position: "relative" }}>
+        <Tabs value={tab} onChange={changeTab} items={TABS} />
+        <div style={{ position: "absolute", right: 0, top: 4 }}>
+          <NotificationBell />
+        </div>
+      </div>
 
       {error && (
         <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>

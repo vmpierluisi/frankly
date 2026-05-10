@@ -10,6 +10,7 @@ import RolloutSummaryCard from "./RolloutSummaryCard.jsx";
 import { ProfileAccuracyChip } from "./ProfileAccuracyRing.jsx";
 import ScenarioRadar from "./ScenarioRadar.jsx";
 import { formatCriterion } from "./Widgets.jsx";
+import ScheduleInterviewModal from "./ScheduleInterviewModal.jsx";
 
 /**
  * Roadmap 2 / PR #2c — Fit Profile v3.
@@ -61,6 +62,7 @@ export default function FitProfileV3({
 
   const [explainKey, setExplainKey] = useState(null); // dimension key being explained
   const [verified, setVerified] = useState(null);
+  const [scheduling, setScheduling] = useState(false); // PR #4 — open the slot-picker modal
 
   useEffect(() => {
     if (!candidate?.id) return;
@@ -75,9 +77,37 @@ export default function FitProfileV3({
   return (
     <div>
       {/* Headline */}
-      <div className="label-mono" style={{ marginBottom: 12 }}>
-        Fit Report v3 · Confidential · Screening Signal
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="label-mono">
+          Fit Report v3 · Confidential · Screening Signal
+        </div>
+        {matchId && (
+          <button
+            type="button"
+            className="primary"
+            onClick={() => setScheduling(true)}
+            style={{ padding: "10px 18px" }}
+          >
+            Schedule interview
+          </button>
+        )}
       </div>
+      {scheduling && (
+        <ScheduleInterviewModal
+          matchId={matchId}
+          candidateName={candidate?.display_name}
+          onClose={() => setScheduling(false)}
+        />
+      )}
       <div
         style={{
           display: "flex",

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
-import { candidates } from "../api.js";
+import { candidates, interviews as interviewsApi } from "../api.js";
 import { supabase } from "../lib/supabase.js";
 import { useAuth } from "../lib/auth.js";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../lib/roleFamilies.js";
 import { GeneratingScreen } from "../components/Widgets.jsx";
 import Tabs from "../components/Tabs.jsx";
+import NotificationBell from "../components/NotificationBell.jsx";
 import ProfileAccuracyRing from "../components/ProfileAccuracyRing.jsx";
 import VerifiedProfileView from "../components/VerifiedProfileView.jsx";
 import VerifiedProfileEditor from "../components/VerifiedProfileEditor.jsx";
@@ -176,7 +177,18 @@ export default function CandidateDashboard() {
         Managers see only what the system synthesizes — never this raw view.
       </p>
 
-      <Tabs value={tab} onChange={setTab} items={TABS} />
+      <div style={{ position: "relative" }}>
+        <Tabs value={tab} onChange={setTab} items={TABS} />
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 4,
+          }}
+        >
+          <NotificationBell onItemClick={() => setTab("matches")} />
+        </div>
+      </div>
 
       {error && (
         <div style={{ color: COLORS.accent, fontSize: 14, fontStyle: "italic", marginBottom: 20 }}>
@@ -440,31 +452,280 @@ function StatusChip({ done }) {
 }
 
 // ===========================================================================
-// Matches tab — interview invites placeholder.
-// Full UX (accept / decline / propose) lands in PR #4.
+// Matches tab — interview invites + vacancy reveal (Roadmap 2 / PR #4).
 // ===========================================================================
 function MatchesTab() {
+  const [interviews, setInterviews] = useState(null);
+  const [error, setError] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  async function refresh() {
+    try {
+      setInterviews(await interviewsApi.listMine());
+      setError(null);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function act(id, fn) {
+    setBusyId(id);
+    try {
+      await fn();
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (interviews === null && !error) {
+    return (
+      <section className="card" style={{ textAlign: "center", padding: 32, color: COLORS.muted }}>
+        Loading invites…
+      </section>
+    );
+  }
+
+  if ((interviews || []).length === 0) {
+    return (
+      <section className="card" style={{ textAlign: "center", padding: "48px 28px" }}>
+        <div className="label-mono" style={{ marginBottom: 14 }}>Interview invites</div>
+        <p
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 22,
+            margin: "0 0 12px",
+            color: COLORS.ink,
+          }}
+        >
+          No invites yet.
+        </p>
+        <p style={{ color: COLORS.muted, fontSize: 15, maxWidth: 480, margin: "0 auto" }}>
+          When a recruiter wants to interview you, the role and proposed times will
+          appear here — and only here. You won't be told who's evaluating you in the
+          meantime, so the signal stays clean.
+        </p>
+        {error && (
+          <div style={{ marginTop: 16, color: COLORS.accent, fontSize: 13 }}>{error}</div>
+        )}
+      </section>
+    );
+  }
+
   return (
-    <section className="card" style={{ textAlign: "center", padding: "48px 28px" }}>
-      <div className="label-mono" style={{ marginBottom: 14 }}>
-        Interview invites
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {error && (
+        <div style={{ color: COLORS.accent, fontSize: 13 }}>{error}</div>
+      )}
+      {interviews.map((iv) => (
+        <InterviewCard
+          key={iv.id}
+          interview={iv}
+          busy={busyId === iv.id}
+          onAccept={(slot) => act(iv.id, () => interviewsApi.accept(iv.id, slot))}
+          onDecline={(msg) => act(iv.id, () => interviewsApi.decline(iv.id, msg))}
+          onCounter={(slots, msg) =>
+            act(iv.id, () => interviewsApi.counter(iv.id, slots, msg))
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+function InterviewCard({ interview, busy, onAccept, onDecline, onCounter }) {
+  const [selected, setSelected] = useState(interview.proposed_slots?.[0] || "");
+  const [counterMode, setCounterMode] = useState(false);
+  const [counterSlots, setCounterSlots] = useState(["", "", ""]);
+  const [counterMsg, setCounterMsg] = useState("");
+  const status = interview.status;
+  const isDone = status === "accepted" || status === "declined";
+
+  function submitCounter() {
+    const cleaned = counterSlots
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => new Date(s).toISOString());
+    if (cleaned.length === 0) return;
+    onCounter(cleaned, counterMsg || null);
+  }
+
+  return (
+    <section className="card" style={{ padding: 24 }}>
+      <div className="label-mono" style={{ marginBottom: 8 }}>
+        {interview.organization_name || "Vacancy"} · Interview invite
       </div>
-      <p
-        style={{
-          fontFamily: FONT_DISPLAY,
-          fontSize: 22,
-          margin: "0 0 12px",
-          color: COLORS.ink,
-        }}
-      >
-        No invites yet.
-      </p>
-      <p style={{ color: COLORS.muted, fontSize: 15, maxWidth: 480, margin: "0 auto" }}>
-        When a recruiter wants to interview you, the role and proposed times will
-        appear here — and only here. You won't be told who's evaluating you in the
-        meantime, so the signal stays clean.
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
+        <h3
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 26,
+            fontWeight: 500,
+            margin: "0 0 4px",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {interview.position_name}
+        </h3>
+        <StatusPill status={status} />
+      </div>
+      <div style={{ color: COLORS.muted, fontSize: 15, marginBottom: 14 }}>
+        {interview.position_role}
+      </div>
+
+      {status === "accepted" && interview.selected_slot && (
+        <div style={{ fontSize: 15 }}>
+          Confirmed for{" "}
+          <strong>{new Date(interview.selected_slot).toLocaleString()}</strong>.
+        </div>
+      )}
+      {status === "declined" && (
+        <div style={{ color: COLORS.muted, fontSize: 14 }}>You declined this invite.</div>
+      )}
+
+      {!isDone && !counterMode && (
+        <>
+          <div className="label-mono" style={{ marginBottom: 8 }}>Pick a time</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {(interview.proposed_slots || []).map((slot) => (
+              <label
+                key={slot}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  border: `1px solid ${selected === slot ? COLORS.ink : COLORS.rule}`,
+                  cursor: "pointer",
+                  background: selected === slot ? "#fffbf2" : "transparent",
+                }}
+              >
+                <input
+                  type="radio"
+                  name={`slot-${interview.id}`}
+                  value={slot}
+                  checked={selected === slot}
+                  onChange={() => setSelected(slot)}
+                />
+                <span style={{ fontFamily: FONT_MONO, fontSize: 13 }}>
+                  {new Date(slot).toLocaleString()}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy || !selected}
+              onClick={() => onAccept(selected)}
+              style={{ padding: "10px 18px" }}
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy}
+              onClick={() => setCounterMode(true)}
+              style={{ padding: "10px 18px" }}
+            >
+              Propose new time
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy}
+              onClick={() => onDecline(null)}
+              style={{ padding: "10px 18px" }}
+            >
+              Decline
+            </button>
+          </div>
+        </>
+      )}
+
+      {!isDone && counterMode && (
+        <>
+          <div className="label-mono" style={{ marginBottom: 8 }}>Counter-propose</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {counterSlots.map((s, i) => (
+              <input
+                key={i}
+                type="datetime-local"
+                className="ed"
+                value={s}
+                onChange={(e) =>
+                  setCounterSlots((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+                }
+              />
+            ))}
+          </div>
+          <textarea
+            className="ed"
+            placeholder="Optional note (e.g. timezone constraints)"
+            value={counterMsg}
+            onChange={(e) => setCounterMsg(e.target.value)}
+            style={{ minHeight: 80, marginBottom: 12 }}
+          />
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={submitCounter}
+              style={{ padding: "10px 18px" }}
+            >
+              Send counter
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy}
+              onClick={() => setCounterMode(false)}
+              style={{ padding: "10px 18px" }}
+            >
+              Back
+            </button>
+          </div>
+        </>
+      )}
     </section>
+  );
+}
+
+function StatusPill({ status }) {
+  const label = {
+    proposed: "Awaiting your response",
+    accepted: "Accepted",
+    declined: "Declined",
+    rescheduled: "Counter-proposed",
+    completed: "Completed",
+  }[status] || status;
+  const color =
+    status === "accepted" ? "#1f7a3b" :
+    status === "declined" ? COLORS.accent :
+    COLORS.muted;
+  return (
+    <span
+      style={{
+        fontFamily: FONT_MONO,
+        fontSize: 11,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color,
+        border: `1px solid ${color}`,
+        padding: "3px 8px",
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
