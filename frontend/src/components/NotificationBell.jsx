@@ -74,37 +74,64 @@ export default function NotificationBell({ onItemClick }) {
 
   return (
     <div style={{ position: "relative", display: "inline-block" }} ref={popoverRef}>
+      <style>{`
+        @keyframes bell-swing {
+          0%, 100% { transform: rotate(0deg); }
+          15% { transform: rotate(12deg); }
+          30% { transform: rotate(-10deg); }
+          45% { transform: rotate(6deg); }
+          60% { transform: rotate(-3deg); }
+          75% { transform: rotate(1deg); }
+        }
+        .bell-icon { transform-origin: 50% 4px; transition: color 0.15s; color: ${COLORS.muted}; }
+        .bell-btn:hover .bell-icon { color: ${COLORS.ink}; }
+        .bell-btn[data-unread="1"] .bell-icon { color: ${COLORS.ink}; animation: bell-swing 1.6s ease-in-out infinite; }
+      `}</style>
       <button
         type="button"
         aria-label="Notifications"
+        className="bell-btn"
+        data-unread={unreadCount > 0 ? "1" : "0"}
         onClick={() => setOpen((o) => !o)}
         style={{
           background: "transparent",
-          border: `1px solid ${COLORS.rule}`,
-          padding: "8px 12px",
+          border: "none",
+          padding: 6,
           cursor: "pointer",
           position: "relative",
-          fontSize: 18,
-          lineHeight: 1,
-          fontFamily: FONT_MONO,
+          lineHeight: 0,
         }}
       >
-        <span aria-hidden>🔔</span>
+        <svg
+          className="bell-icon"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 8H4c0-2 2-3 2-8Z" />
+          <path d="M10 20a2 2 0 0 0 4 0" />
+        </svg>
         {unreadCount > 0 && (
           <span
             style={{
               position: "absolute",
-              top: -6,
-              right: -6,
+              top: 0,
+              right: 0,
               background: COLORS.accent,
               color: "#fff",
               borderRadius: 999,
               fontFamily: FONT_MONO,
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: 600,
-              minWidth: 18,
-              height: 18,
-              padding: "0 5px",
+              minWidth: 14,
+              height: 14,
+              padding: "0 4px",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",

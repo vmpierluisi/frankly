@@ -158,16 +158,8 @@ export default function CandidateDashboard() {
 
   return (
     <main className="container" style={{ maxWidth: 960 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <div className="label-mono">Candidate · Dashboard</div>
-        <NotificationBell onItemClick={() => setTab("matches")} />
+      <div className="label-mono" style={{ marginBottom: 12 }}>
+        Candidate · Dashboard
       </div>
       <h1
         style={{
@@ -185,7 +177,18 @@ export default function CandidateDashboard() {
         Managers see only what the system synthesizes — never this raw view.
       </p>
 
-      <Tabs value={tab} onChange={setTab} items={TABS} />
+      <div style={{ position: "relative" }}>
+        <Tabs value={tab} onChange={setTab} items={TABS} />
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 4,
+          }}
+        >
+          <NotificationBell onItemClick={() => setTab("matches")} />
+        </div>
+      </div>
 
       {error && (
         <div style={{ color: COLORS.accent, fontSize: 14, fontStyle: "italic", marginBottom: 20 }}>

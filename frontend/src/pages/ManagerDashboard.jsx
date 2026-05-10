@@ -91,16 +91,8 @@ export default function ManagerDashboard() {
 
   return (
     <main className="container" style={{ maxWidth: 1280 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <div className="label-mono">Manager · Dashboard</div>
-        <NotificationBell />
+      <div className="label-mono" style={{ marginBottom: 12 }}>
+        Manager · Dashboard
       </div>
       <h2
         style={{
@@ -122,7 +114,12 @@ export default function ManagerDashboard() {
           : "Candidates are ranked by simulation fit score — updated automatically as new candidates complete intake. Screening signal only; not a hiring decision."}
       </p>
 
-      <Tabs value={tab} onChange={changeTab} items={TABS} />
+      <div style={{ position: "relative" }}>
+        <Tabs value={tab} onChange={changeTab} items={TABS} />
+        <div style={{ position: "absolute", right: 0, top: 4 }}>
+          <NotificationBell />
+        </div>
+      </div>
 
       {error && (
         <div style={{ color: COLORS.accent, marginBottom: 24, fontStyle: "italic" }}>{error}</div>
