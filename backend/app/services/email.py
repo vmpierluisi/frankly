@@ -140,6 +140,23 @@ def send_interview_declined(
     _send(to, f"Interview declined · {candidate_name}", _wrap("Interview declined", body), tag="interview_declined")
 
 
+def send_calibration_nudge(
+    *, to: str, display_name: str | None = None
+) -> None:
+    """PR #5 — invite a candidate to refine their simulation profile."""
+    href = f"{settings.frontend_url}/candidate#overview"
+    name = (display_name or "").split(" ")[0]
+    hello = f"<p>Hi{(' ' + name) if name else ''},</p>"
+    body = (
+        hello
+        + '<p>We just simulated a fit profile for you. Take 60 seconds to '
+        'tell us how close the simulation got to your real instincts — every '
+        'answer sharpens how we represent you to recruiters.</p>'
+        + _cta(href, "Calibrate my profile")
+    )
+    _send(to, "60 seconds to sharpen your profile", _wrap("Help us know you better", body), tag="calibration_nudge")
+
+
 def send_interview_counter(
     *, to: str, candidate_name: str, position_name: str, counter_slots: list[str], message: str | None
 ) -> None:

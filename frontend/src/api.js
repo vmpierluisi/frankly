@@ -247,4 +247,17 @@ export const notifications = {
     request(`/notifications/${id}/dismiss`, { method: "POST", auth: true }),
 };
 
+// ---------- Calibration (Roadmap 2 / PR #5) ----------
+export const calibration = {
+  list: () => request("/calibration", { auth: true }),
+  get: (id) => request(`/calibration/${id}`, { auth: true }),
+  submit: (id, { selection_index = null, free_text = null } = {}) =>
+    request(`/calibration/${id}/submit`, {
+      method: "POST",
+      body: { selection_index, free_text },
+      auth: true,
+    }),
+  timeline: () => request("/calibration/timeline", { auth: true }),
+};
+
 export const API_BASE = BASE;

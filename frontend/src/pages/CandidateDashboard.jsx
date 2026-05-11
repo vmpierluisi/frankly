@@ -16,6 +16,8 @@ import NotificationBell from "../components/NotificationBell.jsx";
 import ProfileAccuracyRing from "../components/ProfileAccuracyRing.jsx";
 import VerifiedProfileView from "../components/VerifiedProfileView.jsx";
 import VerifiedProfileEditor from "../components/VerifiedProfileEditor.jsx";
+import CalibrationCard from "../components/CalibrationCard.jsx";
+import AccuracyTimelineModal from "../components/AccuracyTimelineModal.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -186,7 +188,11 @@ export default function CandidateDashboard() {
             top: 4,
           }}
         >
-          <NotificationBell onItemClick={() => setTab("matches")} />
+          <NotificationBell
+            onItemClick={(notif) =>
+              setTab(notif?.type === "calibration_request" ? "overview" : "matches")
+            }
+          />
         </div>
       </div>
 
@@ -244,12 +250,29 @@ function OverviewTab({
 }) {
   const sources = extractionSources(profile, verified);
   const baseline = deriveBaselineAccuracy(profile, verified);
-  const displayedAccuracy = Math.max(profile.profile_accuracy_score ?? 0, baseline);
+  const [serverAccuracy, setServerAccuracy] = React.useState(
+    profile.profile_accuracy_score ?? 0,
+  );
+  React.useEffect(() => {
+    setServerAccuracy(profile.profile_accuracy_score ?? 0);
+  }, [profile.profile_accuracy_score]);
+  const displayedAccuracy = Math.max(serverAccuracy, baseline);
+  const [timelineOpen, setTimelineOpen] = React.useState(false);
+
+  const refreshAccuracy = () => {
+    candidates
+      .me()
+      .then((p) => setServerAccuracy(p.profile_accuracy_score ?? 0))
+      .catch(() => {});
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       <section className="card">
-        <ProfileAccuracyRing value={displayedAccuracy} />
+        <ProfileAccuracyRing
+          value={displayedAccuracy}
+          onClick={() => setTimelineOpen(true)}
+        />
         <div style={{ marginTop: 22 }}>
           <CompletenessChecklist profile={profile} />
         </div>
@@ -270,6 +293,14 @@ function OverviewTab({
             : sources.join(" · ")}
         </div>
       </section>
+
+      <CalibrationCard onChanged={refreshAccuracy} />
+
+      <AccuracyTimelineModal
+        open={timelineOpen}
+        onClose={() => setTimelineOpen(false)}
+        displayedAccuracy={displayedAccuracy}
+      />
 
       <BehaviouralAssessmentCard profile={profile} nav={nav} />
 

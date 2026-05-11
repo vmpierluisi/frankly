@@ -77,6 +77,10 @@ async def _run_match_background(match_id: str) -> None:
             match.finished_at = datetime.now(timezone.utc)
             db.commit()
             logger.info("background_runner: match %s succeeded (score=%d)", match_id, match.overall_score)
+
+            # PR #5 — fire-and-forget calibration sampling. Best-effort: any
+            # failure is logged inside the helper and never crashes the match.
+            asyncio.create_task(_run_calibration_sample(match_id))
         except Exception as exc:  # noqa: BLE001
             db.rollback()
             with SessionLocal() as err_db:
@@ -84,6 +88,24 @@ async def _run_match_background(match_id: str) -> None:
                 if err_match:
                     _mark_failed(err_db, err_match, str(exc))
             logger.error("background_runner: match %s failed — %s", match_id, exc)
+
+
+async def _run_calibration_sample(match_id: str) -> None:
+    """PR #5 — sample calibration prompts after a match succeeds.
+
+    Runs in its own session so it doesn't ride on the match's transaction.
+    Best-effort: failures are logged, never re-raised.
+    """
+    try:
+        from ..calibration import sample_after_match
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("calibration import failed: %s", exc)
+        return
+    with SessionLocal() as db:
+        try:
+            await sample_after_match(db=db, match_id=match_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("calibration sample failed for match %s: %s", match_id, exc)
 
 
 def _mark_failed(db, match: models.Match, reason: str) -> None:

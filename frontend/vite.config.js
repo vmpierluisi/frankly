@@ -27,6 +27,7 @@ export default defineConfig({
       "/health": backendUrl,
       "/interviews": backendUrl,
       "/notifications": backendUrl,
+      "/calibration": backendUrl,
     },
   },
 });

@@ -503,6 +503,10 @@ class CalibrationResponse(Base):
         String(40), nullable=False, default="legacy"
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    # PR #5 — captured at submission so the candidate-side timeline view can
+    # render directly from these rows without a separate audit table.
+    accuracy_before: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    accuracy_after: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=None)
 

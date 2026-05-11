@@ -662,6 +662,53 @@ class NotificationOut(BaseModel):
 
 
 # ----------------------------------------------------------------------------
+# Roadmap 2 / PR #5 — calibration loop
+# ----------------------------------------------------------------------------
+class CalibrationOptionOut(BaseModel):
+    text: str
+    skill_level: str = ""
+    # ``is_agent_answer`` is intentionally NOT exposed to the candidate.
+
+
+class CalibrationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    candidate_id: str
+    rollout_id: str | None
+    scenario_id: str | None
+    agent_response_text: str
+    mcq_options: list[CalibrationOptionOut] = Field(default_factory=list)
+    mode: str
+    status: str
+    divergence_score: float | None = None
+    candidate_selection_index: int | None = None
+    candidate_free_text: str | None = None
+    accuracy_before: int | None = None
+    accuracy_after: int | None = None
+    created_at: datetime
+    submitted_at: datetime | None = None
+
+
+class CalibrationSubmitIn(BaseModel):
+    selection_index: int | None = None
+    free_text: str | None = None
+
+
+class CalibrationTimelinePoint(BaseModel):
+    calibration_id: str
+    submitted_at: datetime | None
+    accuracy_before: int | None
+    accuracy_after: int | None
+    divergence: float | None
+
+
+class CalibrationTimelineOut(BaseModel):
+    current_accuracy: int
+    points: list[CalibrationTimelinePoint] = Field(default_factory=list)
+
+
+# ----------------------------------------------------------------------------
 # Misc
 # ----------------------------------------------------------------------------
 class HealthOut(BaseModel):

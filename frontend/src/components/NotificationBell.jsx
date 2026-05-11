@@ -245,6 +245,8 @@ function formatTitle(n) {
       return "Interview declined";
     case "interview_counter":
       return "Counter-proposal";
+    case "calibration_request":
+      return "Calibration request";
     default:
       return n.type.replace(/_/g, " ");
   }
@@ -264,6 +266,9 @@ function formatBody(n) {
   }
   if (n.type === "interview_counter") {
     return `${p.candidate_display_name || "Candidate"} counter-proposed · ${p.position_name || ""}`;
+  }
+  if (n.type === "calibration_request") {
+    return "60 seconds to sharpen your profile";
   }
   return "";
 }

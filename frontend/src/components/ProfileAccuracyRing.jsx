@@ -6,7 +6,7 @@ import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
  * progress arc. Companion copy makes it honest: low number = early days,
  * grows as the calibration loop (PR #5) adds evidence.
  */
-export default function ProfileAccuracyRing({ value = 0, size = 140 }) {
+export default function ProfileAccuracyRing({ value = 0, size = 140, onClick }) {
   const v = Math.max(0, Math.min(100, Math.round(value)));
   const stroke = 10;
   const r = (size - stroke) / 2;
@@ -16,7 +16,17 @@ export default function ProfileAccuracyRing({ value = 0, size = 140 }) {
   const dashoffset = circumference * (1 - v / 100);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      title={onClick ? "Tap to see how this number sharpened over time" : undefined}
+    >
       <svg
         width={size}
         height={size}
