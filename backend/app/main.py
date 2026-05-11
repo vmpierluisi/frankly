@@ -25,7 +25,7 @@ from .routes import (
     templates,
 )
 from .schemas import HealthOut
-from .seed_data import seed_companies, backfill_company_role_families
+from .seed_data import seed_positions, backfill_position_role_families
 from .services.simulation import background_runner
 
 
@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
         init_db()
 
     with SessionLocal() as db:
-        seed_companies(db)
-        backfill_company_role_families(db)
+        seed_positions(db)
+        backfill_position_role_families(db)
 
     await background_runner.sweep_pending()
     yield

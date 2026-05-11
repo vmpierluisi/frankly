@@ -59,7 +59,7 @@ class _StubTeam:
     scenarios: list = []
 
 
-class _StubCompany:
+class _StubPosition:
     id = "meridian-capital"
     organization_id = "org-meridian"
     team_id = "team-meridian"
@@ -132,22 +132,22 @@ class _StubScenario:
 
 def test_validate_scoring_dims_all_valid():
     """(7) Returns empty list when all keys are valid."""
-    company = _StubCompany()
-    result = validate_scoring_dims(["analyticalRigor", "writtenDissent"], company)
+    position = _StubPosition()
+    result = validate_scoring_dims(["analyticalRigor", "writtenDissent"], position)
     assert result == []
 
 
 def test_validate_scoring_dims_invalid_keys():
     """(7) Returns the invalid keys."""
-    company = _StubCompany()
-    result = validate_scoring_dims(["analyticalRigor", "nonExistentKey"], company)
+    position = _StubPosition()
+    result = validate_scoring_dims(["analyticalRigor", "nonExistentKey"], position)
     assert "nonExistentKey" in result
     assert "analyticalRigor" not in result
 
 
 def test_validate_scoring_dims_empty():
-    company = _StubCompany()
-    assert validate_scoring_dims([], company) == []
+    position = _StubPosition()
+    assert validate_scoring_dims([], position) == []
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +156,8 @@ def test_validate_scoring_dims_empty():
 
 def test_render_prompt_includes_criteria_and_artifacts():
     """(8) Prompt includes criterion keys and artifact text."""
-    company = _StubCompany()
-    prompt = _render_drafter_user_prompt(company)
+    position = _StubPosition()
+    prompt = _render_drafter_user_prompt(position)
     assert "analyticalRigor" in prompt
     assert "writtenDissent" in prompt
     assert "written rigor" in prompt
@@ -172,7 +172,7 @@ def test_render_prompt_includes_criteria_and_artifacts():
 async def test_draft_scenarios_returns_orm_objects():
     """(1) draft_scenarios() returns a list of MomentOfTruth ORM objects."""
     import app.models as m
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_library()
 
@@ -180,7 +180,7 @@ async def test_draft_scenarios_returns_orm_objects():
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await draft_scenarios(company, budget=budget)
+        result = await draft_scenarios(position, budget=budget)
 
     assert len(result) == 3
     for s in result:
@@ -190,7 +190,7 @@ async def test_draft_scenarios_returns_orm_objects():
 @pytest.mark.asyncio
 async def test_draft_scenarios_required_fields():
     """(2) Each scenario has all required fields set correctly."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_library()
 
@@ -198,10 +198,10 @@ async def test_draft_scenarios_required_fields():
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await draft_scenarios(company, budget=budget)
+        result = await draft_scenarios(position, budget=budget)
 
     first = result[0]
-    assert first.team_id == company.team_id
+    assert first.team_id == position.team_id
     assert first.title == "IC Memo Under Pressure"
     assert first.scenario_type == "dyad"
     assert first.is_llm_drafted is True
@@ -213,7 +213,7 @@ async def test_draft_scenarios_required_fields():
 @pytest.mark.asyncio
 async def test_draft_scenarios_filters_invalid_scoring_dims():
     """(3) scoring_dims in returned scenarios are filtered to valid criterion keys."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = {
         "scenarios": [{
@@ -226,7 +226,7 @@ async def test_draft_scenarios_filters_invalid_scoring_dims():
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await draft_scenarios(company, budget=budget)
+        result = await draft_scenarios(position, budget=budget)
 
     assert "analyticalRigor" in result[0].scoring_dims
     assert "INVALID_KEY" not in result[0].scoring_dims
@@ -235,7 +235,7 @@ async def test_draft_scenarios_filters_invalid_scoring_dims():
 @pytest.mark.asyncio
 async def test_draft_scenarios_ordering_sequential():
     """Ordering values are 0, 1, 2, ..."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_library()
 
@@ -243,7 +243,7 @@ async def test_draft_scenarios_ordering_sequential():
         "app.services.simulation.scenario_engine.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await draft_scenarios(company, budget=budget)
+        result = await draft_scenarios(position, budget=budget)
 
     assert [s.ordering for s in result] == list(range(len(result)))
 

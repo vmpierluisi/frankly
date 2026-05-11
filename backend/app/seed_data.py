@@ -1,4 +1,4 @@
-"""Seed content: BFI-10, SJTs, and two contrasting seed companies.
+"""Seed content: BFI-10, SJTs, and two contrasting seed positions.
 
 Meridian is ported VERBATIM from hiring-sim-demo.jsx per the brief. Do not
 redesign — the psychometric content was already production-ready there.
@@ -136,9 +136,9 @@ SJTS = [
 
 
 # ---------------------------------------------------------------------------
-# SEED COMPANIES
+# SEED POSITIONS
 # ---------------------------------------------------------------------------
-SEED_COMPANIES = [
+SEED_POSITIONS = [
     {
         "id": "meridian-capital",
         "name": "Meridian Capital Partners",
@@ -148,7 +148,7 @@ SEED_COMPANIES = [
         "target_seniority": "mid",
         "is_open": True,
         "artifact_values": (
-            "We write checks on companies our competitors don't understand. "
+            "We write checks on positions our competitors don't understand. "
             "Our edge is patience and homework, not speed. Analysts are expected "
             "to disagree with deal teams in writing, early, and often. We reward "
             "being right over being first. We do not reward hustle theatre."
@@ -234,15 +234,15 @@ SEED_COMPANIES = [
 # ---------------------------------------------------------------------------
 # Loader — idempotent; safe to call on every boot.
 # ---------------------------------------------------------------------------
-def seed_companies(db: Session) -> None:
-    """Seed Organization → Team → Position rows from SEED_COMPANIES.
+def seed_positions(db: Session) -> None:
+    """Seed Organization → Team → Position rows from SEED_POSITIONS.
 
     Each spec produces exactly one Org + one Team + one Position. Existing
     Position rows are left untouched.
     """
     import uuid
 
-    for spec in SEED_COMPANIES:
+    for spec in SEED_POSITIONS:
         existing = db.get(models.Position, spec["id"])
         if existing is not None:
             continue
@@ -265,7 +265,7 @@ def seed_companies(db: Session) -> None:
         )
         db.add(team)
 
-        company = models.Position(
+        position = models.Position(
             id=spec["id"],
             organization_id=org.id,
             team_id=team.id,
@@ -277,7 +277,7 @@ def seed_companies(db: Session) -> None:
             artifact_role_spec=spec.get("artifact_role_spec", ""),
         )
         for crit in spec.get("criteria", []):
-            company.criteria.append(
+            position.criteria.append(
                 models.Criterion(
                     key=crit["key"],
                     label=crit["label"],
@@ -286,29 +286,29 @@ def seed_companies(db: Session) -> None:
                     ordering=crit.get("ordering", 0),
                 )
             )
-        db.add(company)
+        db.add(position)
     db.commit()
 
 
-def backfill_company_role_families(db: Session) -> None:
-    """Idempotent backfill: set role_family/target_seniority on existing seed companies."""
+def backfill_position_role_families(db: Session) -> None:
+    """Idempotent backfill: set role_family/target_seniority on existing seed positions."""
     backfill = {
         "meridian-capital": {"role_family": "financial_analyst", "target_seniority": "mid", "is_open": True},
         "kestrel-growth":   {"role_family": "financial_analyst", "target_seniority": "senior", "is_open": True},
     }
     for position_id, fields in backfill.items():
-        company = db.get(models.Position, position_id)
-        if company is None:
+        position = db.get(models.Position, position_id)
+        if position is None:
             continue
-        if company.role_family is None:
-            company.role_family = fields["role_family"]
-        if company.target_seniority is None:
-            company.target_seniority = fields["target_seniority"]
+        if position.role_family is None:
+            position.role_family = fields["role_family"]
+        if position.target_seniority is None:
+            position.target_seniority = fields["target_seniority"]
     db.commit()
 
 
-async def seed_scenarios_for_seed_companies(db: Session) -> None:
-    """One-time bootstrap: draft scenario libraries for seed companies if absent.
+async def seed_scenarios_for_seed_positions(db: Session) -> None:
+    """One-time bootstrap: draft scenario libraries for seed positions if absent.
 
     Idempotent. Safe on every boot. Requires a real OpenRouter key to run.
     """
@@ -316,25 +316,25 @@ async def seed_scenarios_for_seed_companies(db: Session) -> None:
     from .services.simulation.cost_tracker import CostBudget
 
     for position_id in ("meridian-capital", "kestrel-growth"):
-        company = db.get(models.Position, position_id)
-        if company is None:
+        position = db.get(models.Position, position_id)
+        if position is None:
             continue
         existing = (
             db.query(models.MomentOfTruth)
-            .filter_by(position_id=company.id)
+            .filter_by(position_id=position.id)
             .count()
         )
         if existing > 0:
             continue
         budget = CostBudget(ceiling_usd=10.0)
-        scenarios = await scenario_engine.draft_scenarios(company, budget=budget)
+        scenarios = await scenario_engine.draft_scenarios(position, budget=budget)
         for s in scenarios:
             db.add(s)
     db.commit()
 
 
-async def seed_teams_for_seed_companies(db: Session) -> None:
-    """One-time bootstrap: synthesize teammates for seed companies if absent.
+async def seed_teams_for_seed_positions(db: Session) -> None:
+    """One-time bootstrap: synthesize teammates for seed positions if absent.
 
     Idempotent. Safe on every boot. Requires a real OpenRouter key to run.
     """
@@ -342,18 +342,18 @@ async def seed_teams_for_seed_companies(db: Session) -> None:
     from .services.simulation.cost_tracker import CostBudget
 
     for position_id in ("meridian-capital", "kestrel-growth"):
-        company = db.get(models.Position, position_id)
-        if company is None:
+        position = db.get(models.Position, position_id)
+        if position is None:
             continue
         existing = (
             db.query(models.SyntheticTeammate)
-            .filter_by(position_id=company.id)
+            .filter_by(position_id=position.id)
             .count()
         )
         if existing > 0:
             continue
         budget = CostBudget(ceiling_usd=10.0)
-        teammates = await team_synthesizer.synthesize(company, budget=budget)
+        teammates = await team_synthesizer.synthesize(position, budget=budget)
         for t in teammates:
             db.add(t)
     db.commit()

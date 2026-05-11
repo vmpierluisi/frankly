@@ -62,7 +62,7 @@ class _StubTeam:
     scenarios: list = []
 
 
-class _StubCompany:
+class _StubPosition:
     id = "meridian-capital"
     organization_id = "org-meridian"
     team_id = "team-meridian"
@@ -130,7 +130,7 @@ def _validate_required_keys(obj: dict, schema: dict) -> list[str]:
 @pytest.mark.asyncio
 async def test_extract_centroid_returns_all_required_keys():
     """(1) extract_centroid() output contains all TeamCentroid required keys."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_centroid()
 
@@ -138,7 +138,7 @@ async def test_extract_centroid_returns_all_required_keys():
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await extract_centroid(company, budget=budget)
+        result = await extract_centroid(position, budget=budget)
 
     errors = _validate_required_keys(result, TEAM_CENTROID_SCHEMA)
     assert errors == [], errors
@@ -147,7 +147,7 @@ async def test_extract_centroid_returns_all_required_keys():
 @pytest.mark.asyncio
 async def test_big_five_centroid_has_provenance():
     """(2) Every big_five_centroid trait carries a provenance string."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_centroid()
 
@@ -155,7 +155,7 @@ async def test_big_five_centroid_has_provenance():
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await extract_centroid(company, budget=budget)
+        result = await extract_centroid(position, budget=budget)
 
     bf = result["big_five_centroid"]
     for trait in ("openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"):
@@ -168,7 +168,7 @@ async def test_big_five_centroid_has_provenance():
 @pytest.mark.asyncio
 async def test_sigma_recommendations_has_all_keys():
     """(3) sigma_recommendations contains big_five, skill, work_style."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_centroid()
 
@@ -176,7 +176,7 @@ async def test_sigma_recommendations_has_all_keys():
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await extract_centroid(company, budget=budget)
+        result = await extract_centroid(position, budget=budget)
 
     sigma = result["sigma_recommendations"]
     assert "big_five" in sigma
@@ -187,7 +187,7 @@ async def test_sigma_recommendations_has_all_keys():
 @pytest.mark.asyncio
 async def test_centroid_tensions_is_list():
     """(4) centroid_tensions is a list; each entry has id/description/evidence."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = _make_canned_centroid()
 
@@ -195,7 +195,7 @@ async def test_centroid_tensions_is_list():
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await extract_centroid(company, budget=budget)
+        result = await extract_centroid(position, budget=budget)
 
     tensions = result["centroid_tensions"]
     assert isinstance(tensions, list)
@@ -207,8 +207,8 @@ async def test_centroid_tensions_is_list():
 
 def test_render_prompt_includes_knowledge_graph_summary():
     """(5) Knowledge graph summary appears in the rendered user prompt."""
-    company = _StubCompany()
-    prompt = _render_centroid_user_prompt(company)
+    position = _StubPosition()
+    prompt = _render_centroid_user_prompt(position)
     # The stub company has a knowledge_graph with one value node
     assert "Rigor" in prompt or "knowledge_graph" in prompt.lower() or "(none)" in prompt
     assert "KNOWLEDGE GRAPH NODES" in prompt
@@ -216,8 +216,8 @@ def test_render_prompt_includes_knowledge_graph_summary():
 
 def test_render_criteria_block_includes_all_criteria():
     """criteria_block renders all criteria with keys and labels."""
-    company = _StubCompany()
-    block = _render_criteria_block(company)
+    position = _StubPosition()
+    block = _render_criteria_block(position)
     assert "analyticalRigor" in block
     assert "writtenDissent" in block
     assert "Analytical Rigor" in block
@@ -225,7 +225,7 @@ def test_render_criteria_block_includes_all_criteria():
 
 def test_render_criteria_block_empty():
     """criteria_block returns placeholder when no criteria defined."""
-    class _NoCriteria(_StubCompany):
+    class _NoCriteria(_StubPosition):
         criteria = []
 
     block = _render_criteria_block(_NoCriteria())
@@ -245,7 +245,7 @@ def test_render_prompt_no_artifacts_uses_placeholder():
         teammates: list = []
         scenarios: list = []
 
-    class _Bare(_StubCompany):
+    class _Bare(_StubPosition):
         artifact_role_spec = ""
         organization = _BareOrg()
         team = _BareTeam()
@@ -258,7 +258,7 @@ def test_render_prompt_no_artifacts_uses_placeholder():
 @pytest.mark.asyncio
 async def test_extract_centroid_empty_tensions_is_valid():
     """extract_centroid is valid when centroid_tensions is an empty list."""
-    company = _StubCompany()
+    position = _StubPosition()
     budget = CostBudget(ceiling_usd=10.0)
     canned = dict(_make_canned_centroid())
     canned["centroid_tensions"] = []
@@ -267,7 +267,7 @@ async def test_extract_centroid_empty_tensions_is_valid():
         "app.services.simulation.team_synthesizer.tracked_chat_json",
         new=AsyncMock(return_value=canned),
     ):
-        result = await extract_centroid(company, budget=budget)
+        result = await extract_centroid(position, budget=budget)
 
     assert result["centroid_tensions"] == []
     assert result["sigma_recommendations"]["big_five"] == pytest.approx(0.6)
