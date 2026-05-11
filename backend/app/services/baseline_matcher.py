@@ -205,21 +205,26 @@ def _band_for(score: float, company_name: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # Main entry point.
 # ---------------------------------------------------------------------------
-async def run_match(*, persona: dict[str, Any], company: dict[str, Any]) -> dict[str, Any]:
-    """Match one persona against one company. Returns a FitReport dict."""
+async def run_match(*, persona: dict[str, Any], position: dict[str, Any]) -> dict[str, Any]:
+    """Match one persona against one position. Returns a fit-report dict.
 
-    criteria: list[dict[str, Any]] = company["criteria"]
+    The dict-shape contract on the way out still uses ``companyId`` /
+    ``companyName`` camelCase keys for backward-compat with the JSX-era
+    frontend that reads this payload.
+    """
+
+    criteria: list[dict[str, Any]] = position["criteria"]
     criterion_keys = [c["key"] for c in criteria]
     weights: dict[str, float] = {c["key"]: float(c["weight"]) for c in criteria}
 
     user_prompt = USER_PROMPT_TEMPLATE.format(
-        company_name=company["name"],
-        role=company["role"],
-        tagline=company.get("tagline") or "",
-        artifact_values=company["artifact_values"],
-        artifact_role_spec=company["artifact_role_spec"],
-        artifact_team_structure=company["artifact_team_structure"],
-        artifact_sample_comms=company["artifact_sample_comms"],
+        company_name=position["name"],
+        role=position["role"],
+        tagline=position.get("tagline") or "",
+        artifact_values=position["artifact_values"],
+        artifact_role_spec=position["artifact_role_spec"],
+        artifact_team_structure=position["artifact_team_structure"],
+        artifact_sample_comms=position["artifact_sample_comms"],
         criteria_block="\n".join(
             f"  - {c['key']} ({c['label']}, weight {c['weight']:.2f}): {c['description']}"
             for c in criteria
@@ -260,13 +265,13 @@ async def run_match(*, persona: dict[str, Any], company: dict[str, Any]) -> dict
         weighted_sum += float(cs["score"]) * weights.get(key, 0.0)
     overall = int(round(max(0.0, min(100.0, weighted_sum))))
 
-    band, band_note_fallback = _band_for(overall, company["name"])
+    band, band_note_fallback = _band_for(overall, position["name"])
     band_note = (llm_out.get("bandNote") or band_note_fallback).strip()
 
     return {
-        "companyId": company["id"],
-        "companyName": company["name"],
-        "role": company["role"],
+        "companyId": position["id"],
+        "companyName": position["name"],
+        "role": position["role"],
         "overallScore": overall,
         "band": band,
         "bandNote": band_note,

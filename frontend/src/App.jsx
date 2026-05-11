@@ -82,7 +82,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/templates/:companyId?"
+          path="/manager/templates/:positionId?"
           element={
             <RequireAuth auth={auth} role="manager">
               <TemplateSetup />
@@ -90,7 +90,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/positions/:companyId/team"
+          path="/manager/positions/:positionId/team"
           element={
             <RequireAuth auth={auth} role="manager">
               <SyntheticTeamPage />
@@ -98,7 +98,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/positions/:companyId/scenarios"
+          path="/manager/positions/:positionId/scenarios"
           element={
             <RequireAuth auth={auth} role="manager">
               <ScenarioLibraryPage />
@@ -115,7 +115,7 @@ export default function App() {
           }
         />
         <Route
-          path="/manager/positions/:companyId/audit"
+          path="/manager/positions/:positionId/audit"
           element={
             <RequireAuth auth={auth} role="manager">
               <ReliabilityAuditPanel />

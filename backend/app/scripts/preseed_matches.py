@@ -1,9 +1,9 @@
 """Pre-seed simulation matches for the demo leaderboards.
 
-For each seed company, picks N candidates deterministically (mix of seniorities)
+For each seed position, picks N candidates deterministically (mix of seniorities)
 and runs the full V2 simulation synchronously, persisting results.
 
-Idempotent — skips any (candidate, company) pair that already has a
+Idempotent — skips any (candidate, position) pair that already has a
 `status='succeeded'` match.
 
 Usage:
@@ -16,7 +16,7 @@ Options:
     --company ID       Only seed for this company id (repeat for multiple)
 
 Cost estimate (fast mode, K=1, 2 scenarios, 1 judge):
-    ~$0.10–0.20 per candidate, ~$1–2 for 10 candidates × 2 companies.
+    ~$0.10–0.20 per candidate, ~$1–2 for 10 candidates × 2 positions.
 Time:  ~30s/candidate × 10 = ~5 minutes total.
 """
 from __future__ import annotations
@@ -50,22 +50,22 @@ from app.services.simulation import simulation_matcher
 from app.config import settings
 
 
-def _pick_candidates(db, company: models.Position, n: int) -> list[models.Candidate]:
+def _pick_candidates(db, position: models.Position, n: int) -> list[models.Candidate]:
     """Pick N seed candidates compatible with this company's role family + seniority.
 
     Selection is deterministic: sort by id (stable across runs), then take the
-    first N. Excludes candidates that already have a succeeded match for this company.
+    first N. Excludes candidates that already have a succeeded match for this position.
     """
     from app.lib.role_families import compatible_seniorities
 
-    compat = compatible_seniorities(company.target_seniority or "mid")
+    compat = compatible_seniorities(position.target_seniority or "mid")
 
-    # Already-succeeded candidate ids for this company.
+    # Already-succeeded candidate ids for this position.
     succeeded_ids: set[str] = set(
         row[0]
         for row in db.execute(
             select(models.Match.candidate_id).where(
-                models.Match.position_id == company.id,
+                models.Match.position_id == position.id,
                 models.Match.status == "succeeded",
             )
         ).all()
@@ -74,7 +74,7 @@ def _pick_candidates(db, company: models.Position, n: int) -> list[models.Candid
     candidates = db.execute(
         select(models.Candidate).where(
             models.Candidate.is_seed == True,  # noqa: E712
-            models.Candidate.target_role_family == company.role_family,
+            models.Candidate.target_role_family == position.role_family,
             models.Candidate.target_seniority.in_(compat),
             models.Candidate.assessment_status == "completed",
         ).order_by(models.Candidate.id)
@@ -90,20 +90,20 @@ async def _seed_one(
     candidate: models.Candidate,
     dry_run: bool = False,
 ) -> str:
-    """Run simulation for one (candidate, company) pair. Returns status string."""
+    """Run simulation for one (candidate, position) pair. Returns status string."""
     with SessionLocal() as db:
         # Refresh objects in this session.
-        company_db = db.get(models.Position, company.id)
+        position_db = db.get(models.Position, position.id)
         candidate_db = db.get(models.Candidate, candidate.id)
 
-        if company_db is None or candidate_db is None:
+        if position_db is None or candidate_db is None:
             return "skip:not_found"
 
         # Create or reuse a pending Match row.
         existing = db.execute(
             select(models.Match).where(
                 models.Match.candidate_id == candidate_db.id,
-                models.Match.position_id == company_db.id,
+                models.Match.position_id == position_db.id,
             )
         ).scalar_one_or_none()
 
@@ -117,7 +117,7 @@ async def _seed_one(
         else:
             match = models.Match(
                 candidate_id=candidate_db.id,
-                position_id=company_db.id,
+                position_id=position_db.id,
                 status="running",
                 overall_score=0,
                 band="",
@@ -138,7 +138,7 @@ async def _seed_one(
             kwargs: dict = dict(
                 match_id=match_id,
                 candidate=candidate_db,
-                company=company_db,
+                company=position_db,
                 db=db,
             )
             if k is not None:
@@ -169,27 +169,27 @@ async def _seed_one(
 
 async def preseed(
     per_company: int,
-    company_ids: list[str] | None,
+    position_ids: list[str] | None,
     dry_run: bool,
 ) -> None:
     with SessionLocal() as db:
         q = select(models.Position).where(models.Position.is_open == True)  # noqa: E712
-        if company_ids:
-            q = q.where(models.Position.id.in_(company_ids))
-        companies = db.execute(q).scalars().all()
+        if position_ids:
+            q = q.where(models.Position.id.in_(position_ids))
+        positions = db.execute(q).scalars().all()
 
-    if not companies:
-        print("No open companies found. Check that seed data is loaded and migrations are run.")
+    if not positions:
+        print("No open positions found. Check that seed data is loaded and migrations are run.")
         return
 
-    for company in companies:
+    for position in positions:
         print(f"\n{'='*60}")
-        print(f"Company: {company.name} ({company.id})")
-        print(f"  role_family={company.role_family}, target_seniority={company.target_seniority}")
+        print(f"Position: {position.name} ({position.id})")
+        print(f"  role_family={position.role_family}, target_seniority={position.target_seniority}")
 
         with SessionLocal() as db:
-            company_fresh = db.get(models.Position, company.id)
-            candidates = _pick_candidates(db, company_fresh, per_company)
+            position_fresh = db.get(models.Position, position.id)
+            candidates = _pick_candidates(db, position_fresh, per_company)
 
         if not candidates:
             print("  No eligible seed candidates found.")
@@ -202,7 +202,7 @@ async def preseed(
 
         async def _bounded(c):
             async with sem:
-                result = await _seed_one(company, c, dry_run=dry_run)
+                result = await _seed_one(position, c, dry_run=dry_run)
                 label = c.display_name or c.id[:8]
                 print(f"    [{label:<30}] {result}")
                 return result
@@ -220,9 +220,9 @@ async def preseed(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pre-seed demo leaderboards with V2 simulation results.")
-    parser.add_argument("--per-company", type=int, default=10, metavar="N",
+    parser.add_argument("--per-position", type=int, default=10, metavar="N",
                         help="Candidates to simulate per company (default: 10)")
-    parser.add_argument("--company", action="append", dest="company_ids", metavar="ID",
+    parser.add_argument("--position", action="append", dest="position_ids", metavar="ID",
                         help="Only seed this company (repeat for multiple). Default: all open.")
     parser.add_argument("--fast", action="store_true",
                         help="Force SIM_FAST_MODE=1 (K=1, 2 scenarios, 1 judge)")
@@ -237,12 +237,12 @@ def main() -> None:
 
     fast_label = " [FAST MODE]" if (args.fast or settings.sim_fast_mode) else ""
     print(f"preseed_matches{fast_label}")
-    print(f"  per_company={args.per_company}, companies={args.company_ids or 'all open'}")
+    print(f"  per_company={args.per_company}, positions={args.position_ids or 'all open'}")
     print(f"  dry_run={args.dry_run}")
 
     asyncio.run(preseed(
         per_company=args.per_company,
-        company_ids=args.company_ids,
+        position_ids=args.position_ids,
         dry_run=args.dry_run,
     ))
 

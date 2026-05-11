@@ -23,16 +23,16 @@ const TABS = [
 //   1. Manager selects a position from the grid.
 //   2. Leaderboard renders immediately, showing V2 fit reports ranked by score.
 //   3. Rows grow over time as candidates complete intake and simulations finish.
-//   4. Click any row to expand FitProfileV2 inline.
+//   4. Click any row to expand FitProfileV3 inline.
 
 export default function ManagerDashboard() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [companyList, setCompanyList] = useState([]);
+  const [positionList, setPositionList] = useState([]);
   const [seedCount, setSeedCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [selectedPosition, setSelectedPosition] = useState(null);
   // Tab is mirrored into ?tab=... so other routes can deep-link
   // ("Positions / + New position" → /manager?tab=settings).
   const initialTab = searchParams.get("tab") || "overview";
@@ -69,7 +69,7 @@ export default function ManagerDashboard() {
       candidates.list({ is_seed: true }),
     ])
       .then(([cos, seeds]) => {
-        setCompanyList(cos);
+        setPositionList(cos);
         setSeedCount(seeds.length);
       })
       .catch((e) => setError(e.message))
@@ -79,17 +79,17 @@ export default function ManagerDashboard() {
   // Reset leaderboard when a different position is selected.
   useEffect(() => {
     setError("");
-  }, [selectedCompany]);
+  }, [selectedPosition]);
 
   // Selecting a position from Overview should jump to the Positions tab.
   function selectPositionAndShow(id) {
-    setSelectedCompany(id);
+    setSelectedPosition(id);
     changeTab("positions");
   }
 
   if (loading) return <GeneratingScreen note="Loading dashboard…" />;
 
-  const company = companyList.find((c) => c.id === selectedCompany);
+  const company = positionList.find((c) => c.id === selectedPosition);
 
   return (
     <main className="container" style={{ maxWidth: 1280 }}>
@@ -129,7 +129,7 @@ export default function ManagerDashboard() {
 
       {tab === "overview" && (
         <OverviewTab
-          companies={companyList}
+          companies={positionList}
           seedCount={seedCount}
           onPick={selectPositionAndShow}
           onCreate={openNewPosition}
@@ -140,17 +140,17 @@ export default function ManagerDashboard() {
         <PositionsTab
           nav={nav}
           onCreate={openNewPosition}
-          companyList={companyList}
+          positionList={positionList}
           seedCount={seedCount}
-          selectedCompany={selectedCompany}
-          setSelectedCompany={setSelectedCompany}
+          selectedPosition={selectedPosition}
+          setSelectedPosition={setSelectedPosition}
           company={company}
         />
       )}
 
       {tab === "audit" && (
         <AuditTab
-          companyList={companyList}
+          positionList={positionList}
           initialScope={searchParams.get("scope") || "all"}
           initialPositionId={searchParams.get("positionId") || ""}
           onScopeChange={({ scope, positionId }) => {
@@ -305,9 +305,9 @@ function SettingsTab({ nav }) {
 // ===========================================================================
 // Overview tab — KPI strip + open positions list
 // ===========================================================================
-function OverviewTab({ companies: companyList, seedCount, onPick, onCreate }) {
-  const open = companyList.filter((c) => c.is_open !== false);
-  const closed = companyList.length - open.length;
+function OverviewTab({ companies: positionList, seedCount, onPick, onCreate }) {
+  const open = positionList.filter((c) => c.is_open !== false);
+  const closed = positionList.length - open.length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
@@ -319,7 +319,7 @@ function OverviewTab({ companies: companyList, seedCount, onPick, onCreate }) {
         }}
       >
         <Stat label="Open positions" value={open.length} />
-        <Stat label="Total positions" value={companyList.length} />
+        <Stat label="Total positions" value={positionList.length} />
         <Stat label="Closed" value={closed} muted />
         <Stat label="Candidate pool" value={seedCount ?? "—"} />
       </div>
@@ -422,10 +422,10 @@ function Stat({ label, value, muted = false }) {
 function PositionsTab({
   nav,
   onCreate,
-  companyList,
+  positionList,
   seedCount,
-  selectedCompany,
-  setSelectedCompany,
+  selectedPosition,
+  setSelectedPosition,
   company,
 }) {
   return (
@@ -440,7 +440,7 @@ function PositionsTab({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div className="label-mono">Positions ({companyList.length})</div>
+          <div className="label-mono">Positions ({positionList.length})</div>
           {seedCount !== null && seedCount > 0 && (
             <div
               style={{
@@ -474,18 +474,18 @@ function PositionsTab({
           marginBottom: 28,
         }}
       >
-        {companyList.map((c) => (
+        {positionList.map((c) => (
           <PositionCard
             key={c.id}
             company={c}
-            selected={selectedCompany === c.id}
-            onSelect={() => setSelectedCompany(c.id)}
+            selected={selectedPosition === c.id}
+            onSelect={() => setSelectedPosition(c.id)}
             onEdit={(e) => { e.stopPropagation(); nav(`/manager/templates/${c.id}`); }}
             onViewTeam={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/team`); }}
             onViewScenarios={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/scenarios`); }}
           />
         ))}
-        {companyList.length === 0 && (
+        {positionList.length === 0 && (
           <p style={{ color: COLORS.muted, fontSize: 14, gridColumn: "1/-1" }}>
             No positions yet. Create one with "+ New position".
           </p>
@@ -493,8 +493,8 @@ function PositionsTab({
       </div>
 
       {/* ── Leaderboard ─────────────────────────────────────────────────────── */}
-      {selectedCompany ? (
-        <PositionLeaderboard companyId={selectedCompany} />
+      {selectedPosition ? (
+        <PositionLeaderboard positionId={selectedPosition} />
       ) : (
         <div
           style={{

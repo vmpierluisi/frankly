@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 TEAM_CENTROID_SYSTEM = """\
 You extract the implicit centroid trait sheet of a high-functioning teammate
-inside a specific company, from that company's sanctioned artifacts.
+inside a specific position, from that company's sanctioned artifacts.
 
 You do NOT design an aspirational ideal. You describe what the artifacts
 collectively imply about who actually thrives on this team today.
@@ -176,8 +176,8 @@ TEAM_CENTROID_SCHEMA: dict[str, Any] = {
 # Prompt rendering helpers
 # ---------------------------------------------------------------------------
 
-def _render_criteria_block(company: "Position") -> str:
-    criteria = getattr(company, "criteria", []) or []
+def _render_criteria_block(position: "Position") -> str:
+    criteria = getattr(position, "criteria", []) or []
     if not criteria:
         return "  (no criteria defined)"
     return "\n".join(
@@ -186,18 +186,18 @@ def _render_criteria_block(company: "Position") -> str:
     )
 
 
-def _render_centroid_user_prompt(company: "Position") -> str:
-    org = getattr(company, "organization", None)
-    team = getattr(company, "team", None)
+def _render_centroid_user_prompt(position: "Position") -> str:
+    org = getattr(position, "organization", None)
+    team = getattr(position, "team", None)
     return TEAM_CENTROID_USER_TEMPLATE.format(
-        company_name=company.name,
-        role=company.role,
+        company_name=position.name,
+        role=position.role,
         tagline=(org.tagline if org is not None else None) or "(none)",
         artifact_values=(org.mission if org is not None else None) or "(none provided)",
-        artifact_role_spec=company.artifact_role_spec or "(none provided)",
+        artifact_role_spec=position.artifact_role_spec or "(none provided)",
         artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
         artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
-        criteria_block=_render_criteria_block(company),
+        criteria_block=_render_criteria_block(position),
         knowledge_graph_summary=summarize_for_prompt(
             team.knowledge_graph if team is not None else None
         ),
@@ -208,13 +208,13 @@ def _render_centroid_user_prompt(company: "Position") -> str:
 # Phase 2A public API
 # ---------------------------------------------------------------------------
 
-async def extract_centroid(company: "Position", *, budget: CostBudget) -> dict[str, Any]:
+async def extract_centroid(position: "Position", *, budget: CostBudget) -> dict[str, Any]:
     """Extract the team centroid trait sheet from company artifacts.
 
     Returns the TeamCentroid dict. Does not persist to DB — caller decides
     whether to cache.  Consumed by synthesize() in Phase 2B.
     """
-    user_prompt = _render_centroid_user_prompt(company)
+    user_prompt = _render_centroid_user_prompt(position)
     result = await tracked_chat_json(
         budget,
         model=settings.openrouter_persona_model,
@@ -388,15 +388,15 @@ def _render_centroid_tensions_block(centroid: dict[str, Any]) -> str:
     )
 
 
-def _render_artifact_excerpts(company: "Position") -> str:
-    org = getattr(company, "organization", None)
-    team = getattr(company, "team", None)
+def _render_artifact_excerpts(position: "Position") -> str:
+    org = getattr(position, "organization", None)
+    team = getattr(position, "team", None)
     parts: list[str] = []
     mission = (org.mission if org is not None else None) or ""
     if mission:
         parts.append(mission[:400])
-    if getattr(company, "artifact_role_spec", ""):
-        parts.append(company.artifact_role_spec[:400])
+    if getattr(position, "artifact_role_spec", ""):
+        parts.append(position.artifact_role_spec[:400])
     team_structure = (team.artifact_team_structure if team is not None else None) or ""
     if team_structure:
         parts.append(team_structure[:300])
@@ -407,7 +407,7 @@ def _render_artifact_excerpts(company: "Position") -> str:
 
 
 async def _generate_one_teammate(
-    company: "Position",
+    position: "Position",
     centroid: dict[str, Any],
     sampled_sheet: dict[str, Any],
     *,
@@ -415,12 +415,12 @@ async def _generate_one_teammate(
 ) -> dict[str, Any]:
     """Second LLM call: given pre-sampled trait values, produce one teammate."""
     user_prompt = TEAMMATE_GENERATOR_USER_TEMPLATE.format(
-        company_name=company.name,
-        role=company.role,
-        tagline=getattr(company, "tagline", None) or "(none)",
+        company_name=position.name,
+        role=position.role,
+        tagline=getattr(position, "tagline", None) or "(none)",
         centroid_tensions_block=_render_centroid_tensions_block(centroid),
         sampled_trait_sheet_json=json.dumps(sampled_sheet, indent=2),
-        artifact_excerpts=_render_artifact_excerpts(company),
+        artifact_excerpts=_render_artifact_excerpts(position),
     )
     return await tracked_chat_json(
         budget,
@@ -443,12 +443,12 @@ DEFAULT_TEAM_SIZE = 5
 
 
 async def synthesize(
-    company: "Position",
+    position: "Position",
     *,
     budget: CostBudget,
     n: int = DEFAULT_TEAM_SIZE,
 ) -> "list[SyntheticTeammate]":
-    """Generate N synthetic teammates for a company.
+    """Generate N synthetic teammates for a position.
 
     Algorithm (per brief §4.2):
       1. Extract centroid from artifacts (one LLM call).
@@ -461,17 +461,17 @@ async def synthesize(
     """
     from ...models import SyntheticTeammate  # deferred to avoid circular import
 
-    centroid = await extract_centroid(company, budget=budget)
+    centroid = await extract_centroid(position, budget=budget)
 
     rng = random.Random()
     teammates: list[SyntheticTeammate] = []
 
     for i in range(n):
         sampled_sheet = _sample_trait_sheet(centroid, rng)
-        raw = await _generate_one_teammate(company, centroid, sampled_sheet, budget=budget)
+        raw = await _generate_one_teammate(position, centroid, sampled_sheet, budget=budget)
 
         teammate = SyntheticTeammate(
-            team_id=company.team_id,
+            team_id=position.team_id,
             name=raw["name"],
             role_on_team=raw["role_on_team"],
             seniority=raw["seniority"],
@@ -489,6 +489,6 @@ async def synthesize(
 
     logger.info(
         "synthesize[%s]: generated %d teammates (budget spent=%.4f usd)",
-        company.id, len(teammates), budget.spent_usd,
+        position.id, len(teammates), budget.spent_usd,
     )
     return teammates

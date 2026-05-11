@@ -19,7 +19,7 @@ function bandColor(band) {
   return BAND_COLOR[band] || COLORS.muted;
 }
 
-export default function PositionLeaderboard({ companyId }) {
+export default function PositionLeaderboard({ positionId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,7 +29,7 @@ export default function PositionLeaderboard({ companyId }) {
 
   async function load() {
     try {
-      const result = await positions.leaderboard(companyId);
+      const result = await positions.leaderboard(positionId);
       setData(result);
       setError("");
 
@@ -53,13 +53,13 @@ export default function PositionLeaderboard({ companyId }) {
     setExpandedMatchId(null);
     load();
     return () => clearTimeout(pollRef.current);
-  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [positionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleRetry(matchId, candidateId) {
     if (!data) return;
     setRetrying(matchId);
     try {
-      await matches.trigger(candidateId, companyId);
+      await matches.trigger(candidateId, positionId);
       await load();
     } catch (e) {
       setError(`Retry failed: ${e.message}`);
@@ -82,7 +82,7 @@ export default function PositionLeaderboard({ companyId }) {
   );
   const failed = data.results.filter((r) => r.status === "failed");
 
-  const criteriaIndex = {}; // FitProfileV2 uses this for labels — leaderboard loads lazily
+  const criteriaIndex = {}; // FitProfileV3 looks up labels lazily — empty index is fine here
 
   return (
     <div>

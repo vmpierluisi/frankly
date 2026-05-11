@@ -162,7 +162,7 @@ async def run_retrospective(
             }
             import asyncio
             report = await asyncio.wait_for(
-                baseline_run_match(persona=persona, company=company_dict),
+                baseline_run_match(persona=persona, position=company_dict),
                 timeout=60,
             )
             sim_score = int(report.get("overallScore", 0))

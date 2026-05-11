@@ -167,7 +167,7 @@ class CandidateListItem(BaseModel):
 
 
 # ----------------------------------------------------------------------------
-# Companies
+# Positions / criteria
 # ----------------------------------------------------------------------------
 class CriterionIn(BaseModel):
     key: str
@@ -182,7 +182,7 @@ class CriterionOut(CriterionIn):
 
 
 class RequiredSkill(BaseModel):
-    """One row of Company.required_skills.
+    """One row of Position.required_skills.
 
     level: "junior" | "mid" | "senior" — required proficiency for the
     vacancy. Used by FitProfile v3 skill-match scoring and surfaced in the
@@ -249,7 +249,7 @@ class TeamOut(BaseModel):
 
 
 class PositionOut(BaseModel):
-    """Slim list-item view of a position (Company internally).
+    """Slim list-item view of a position.
 
     Used by ``GET /teams/{team_id}/positions``.
     """
@@ -369,57 +369,6 @@ class ExtractCriteriaOut(BaseModel):
 class TriggerMatchIn(BaseModel):
     candidate_id: str
     position_id: str
-
-
-class CriterionScore(BaseModel):
-    score: float
-    justification: str
-
-
-class FitReport(BaseModel):
-    """The matcher's return shape, mirroring the JSX reference envelope."""
-    position_id: str
-    company_name: str
-    role: str
-    overall_score: int
-    band: str
-    band_note: str
-    criterion_scores: dict[str, CriterionScore]
-    inconsistency_flags: list[InconsistencyFlag]
-    audit_trail: dict[str, Any]
-
-
-class SearchMatchIn(BaseModel):
-    position_id: str
-    refresh: bool = False
-
-
-class FitAxes(BaseModel):
-    role: float
-    culture: float
-    growth: float
-
-
-class SearchMatchResultItem(BaseModel):
-    candidate_id: str
-    display_name: str | None = None
-    narrative: str | None = None
-    overall_score: int
-    band: str
-    band_note: str
-    report: dict[str, Any]
-    fit_axes: FitAxes
-    cached: bool
-    match_id: str | None = None
-    is_seed: bool = False
-
-
-class SearchMatchOut(BaseModel):
-    position_id: str
-    company_name: str
-    role: str
-    pool_size: int
-    results: list[SearchMatchResultItem]
 
 
 class MatchOut(BaseModel):

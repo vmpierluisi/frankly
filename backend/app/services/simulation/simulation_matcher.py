@@ -42,7 +42,7 @@ class NoRolloutsScored(RuntimeError):
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-    from ...models import Candidate, Company, MomentOfTruth, Rollout, RolloutScore
+    from ...models import Candidate, MomentOfTruth, Position, Rollout, RolloutScore
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +170,8 @@ def _compute_percentile(
 # Company data helpers
 # ---------------------------------------------------------------------------
 
-def _teammates_as_dicts(company: "Position") -> list[dict[str, Any]]:
-    team = getattr(company, "team", None)
+def _teammates_as_dicts(position: "Position") -> list[dict[str, Any]]:
+    team = getattr(position, "team", None)
     teammates = (team.teammates if team is not None else None) or []
     return [
         {
@@ -187,7 +187,7 @@ def _teammates_as_dicts(company: "Position") -> list[dict[str, Any]]:
     ]
 
 
-def _criteria_as_dicts(company: "Position") -> list[dict[str, Any]]:
+def _criteria_as_dicts(position: "Position") -> list[dict[str, Any]]:
     return [
         {
             "key": c.key,
@@ -195,23 +195,23 @@ def _criteria_as_dicts(company: "Position") -> list[dict[str, Any]]:
             "description": c.description,
             "weight": c.weight,
         }
-        for c in sorted(company.criteria, key=lambda c: c.ordering)
+        for c in sorted(position.criteria, key=lambda c: c.ordering)
     ]
 
 
-def _company_as_dict(company: "Position") -> dict[str, Any]:
-    org = getattr(company, "organization", None)
-    team = getattr(company, "team", None)
+def _company_as_dict(position: "Position") -> dict[str, Any]:
+    org = getattr(position, "organization", None)
+    team = getattr(position, "team", None)
     return {
-        "id": company.id,
-        "name": company.name,
-        "role": company.role,
+        "id": position.id,
+        "name": position.name,
+        "role": position.role,
         "tagline": (org.tagline if org is not None else None) or "",
         "artifact_values": (org.mission if org is not None else None) or "",
-        "artifact_role_spec": company.artifact_role_spec or "",
+        "artifact_role_spec": position.artifact_role_spec or "",
         "artifact_team_structure": (team.artifact_team_structure if team is not None else None) or "",
         "artifact_sample_comms": (team.artifact_sample_comms if team is not None else None) or "",
-        "criteria": _criteria_as_dicts(company),
+        "criteria": _criteria_as_dicts(position),
     }
 
 
@@ -223,7 +223,7 @@ async def run_match(
     *,
     match_id: str,
     candidate: "Candidate",
-    company: "Position",
+    position: "Position",
     db: "Session",
     k_per_scenario: int = _DEFAULT_K,
 ) -> dict[str, Any]:
@@ -246,21 +246,21 @@ async def run_match(
         match_id, None, "match_started",
         {
             "candidate_id": candidate.id,
-            "position_id": company.id,
+            "position_id": position.id,
             "k_per_scenario": k_per_scenario,
         },
         db=db,
     )
 
     # ---- Validate prerequisites -------------------------------------------
-    teammates = _teammates_as_dicts(company)
+    teammates = _teammates_as_dicts(position)
     if not teammates:
         raise HTTPException(
             status_code=409,
             detail="Company has no synthetic team — synthesize the team first.",
         )
 
-    team = getattr(company, "team", None)
+    team = getattr(position, "team", None)
     scenarios: list["MomentOfTruth"] = list(
         (team.scenarios if team is not None else None) or []
     )
@@ -281,8 +281,8 @@ async def run_match(
         db=db,
     )
 
-    criteria = _criteria_as_dicts(company)
-    company_dict = _company_as_dict(company)
+    criteria = _criteria_as_dicts(position)
+    position_dict = _company_as_dict(position)
 
     # ---- Persona resolution -----------------------------------------------
     try:
@@ -321,8 +321,8 @@ async def run_match(
                         k_index=k_index,
                         db=db,
                         budget=budget,
-                        company_name=company.name,
-                        role=company.role,
+                        company_name=position.name,
+                        role=position.role,
                         candidate_label=_candidate_label(candidate),
                     ),
                     timeout=settings.sim_rollout_wall_timeout_s,
@@ -422,7 +422,7 @@ async def run_match(
     legacy_persona = persona.get("_legacy") or persona
     try:
         baseline_report = await asyncio.wait_for(
-            baseline_run_match(persona=legacy_persona, company=company_dict),
+            baseline_run_match(persona=legacy_persona, position=position_dict),
             timeout=60,
         )
         await log_event(
@@ -472,12 +472,12 @@ async def run_match(
         list(all_scores),
         criteria,
         match_id=match_id,
-        position_id=company.id,
-        company_name=company.name,
-        role=company.role,
+        position_id=position.id,
+        company_name=position.name,
+        role=position.role,
         baseline_report=baseline_report,
         audit_extra=audit_extra,
-        required_skills=list(getattr(company, "required_skills", []) or []),
+        required_skills=list(getattr(position, "required_skills", []) or []),
         capability_ledger=(verified_for_aggr or {}).get("capability_ledger"),
     )
 
@@ -500,7 +500,7 @@ async def run_match(
     # excluding the current candidate. Cheap single query.
     fit_profile["percentile"] = _compute_percentile(
         db=db,
-        position_id=company.id,
+        position_id=position.id,
         candidate_id=candidate.id,
         overall_score=fit_profile["overallScore"],
     )

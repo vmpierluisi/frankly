@@ -6,7 +6,7 @@ import { GeneratingScreen } from "../components/Widgets.jsx";
 import ScenarioCard from "../components/ScenarioCard.jsx";
 
 // Manager page: view, draft, and manage the scenario library for a company.
-// Route: /manager/companies/:companyId/scenarios
+// Route: /manager/companies/:positionId/scenarios
 
 const BLANK_FORM = {
   title: "",
@@ -23,7 +23,7 @@ const BLANK_FORM = {
 const TYPE_LABELS = { dyad: "1:1 Dyad", small_group: "Small Group", written: "Written" };
 
 export default function ScenarioLibraryPage() {
-  const { companyId } = useParams();
+  const { positionId } = useParams();
   const nav = useNavigate();
 
   const [company, setCompany] = useState(null);
@@ -39,14 +39,14 @@ export default function ScenarioLibraryPage() {
   const [createError, setCreateError] = useState("");
 
   useEffect(() => {
-    Promise.all([positions.get(companyId), scenarios.list(companyId)])
+    Promise.all([positions.get(positionId), scenarios.list(positionId)])
       .then(([co, sc]) => {
         setCompany(co);
         setScenarioList(sc);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [companyId]);
+  }, [positionId]);
 
   // PR #6 follow-up — scroll to the scenario from the audit panel deep-link
   // (#scenario-<id> in the URL). Runs once scenarios have rendered.
@@ -72,7 +72,7 @@ export default function ScenarioLibraryPage() {
     setError("");
     setDrafting(true);
     try {
-      const result = await scenarios.draft(companyId);
+      const result = await scenarios.draft(positionId);
       setScenarioList(result);
     } catch (e) {
       setError(`Drafting failed: ${e.message}`);
@@ -82,17 +82,17 @@ export default function ScenarioLibraryPage() {
   }
 
   const handleUpdate = useCallback(async (scenarioId, payload) => {
-    const updated = await scenarios.update(companyId, scenarioId, payload);
+    const updated = await scenarios.update(positionId, scenarioId, payload);
     setScenarioList((prev) =>
       prev.map((s) => (s.id === scenarioId ? updated : s))
     );
     return updated;
-  }, [companyId]);
+  }, [positionId]);
 
   const handleDelete = useCallback(async (scenarioId) => {
-    await scenarios.remove(companyId, scenarioId);
+    await scenarios.remove(positionId, scenarioId);
     setScenarioList((prev) => prev.filter((s) => s.id !== scenarioId));
-  }, [companyId]);
+  }, [positionId]);
 
   function updateForm(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -112,7 +112,7 @@ export default function ScenarioLibraryPage() {
     setCreateError("");
     setCreating(true);
     try {
-      const created = await scenarios.create(companyId, form);
+      const created = await scenarios.create(positionId, form);
       setScenarioList((prev) => [...prev, created]);
       setShowCreate(false);
       setForm(BLANK_FORM);
@@ -140,10 +140,10 @@ export default function ScenarioLibraryPage() {
         </button>
         <span style={{ color: COLORS.rule }}>›</span>
         <button
-          onClick={() => nav(`/manager/positions/${companyId}/team`)}
+          onClick={() => nav(`/manager/positions/${positionId}/team`)}
           style={{ background: "none", border: "none", fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: COLORS.muted, cursor: "pointer", padding: 0 }}
         >
-          {company?.name || companyId}
+          {company?.name || positionId}
         </button>
         <span style={{ color: COLORS.rule }}>›</span>
         <span>Scenarios</span>

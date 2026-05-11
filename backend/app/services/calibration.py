@@ -22,7 +22,6 @@ Sampling policy (per spec):
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 from datetime import datetime, timedelta, timezone
@@ -485,23 +484,3 @@ def timeline_for_candidate(
     return out
 
 
-def schedule_in_background(match_id: str) -> None:
-    """Fire-and-forget hook used by ``background_runner`` after a match
-    successfully completes. Runs in its own asyncio task with a fresh
-    session so it doesn't block the match's response handler.
-    """
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-
-    async def _run() -> None:
-        from ..db import SessionLocal
-
-        with SessionLocal() as db:
-            try:
-                await sample_after_match(db=db, match_id=match_id)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("calibration.background_failed match=%s: %s", match_id, exc)
-
-    loop.create_task(_run())

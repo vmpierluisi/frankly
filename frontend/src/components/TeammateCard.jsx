@@ -36,7 +36,7 @@ function TraitSection({ title, traits, max = 5 }) {
   );
 }
 
-export default function TeammateCard({ teammate, companyId, onUpdate, onDelete }) {
+export default function TeammateCard({ teammate, positionId, onUpdate, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);

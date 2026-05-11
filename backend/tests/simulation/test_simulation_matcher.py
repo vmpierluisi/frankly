@@ -108,7 +108,7 @@ class _StubTeam:
         self.scenarios = [_StubScenario()] if has_scenarios else []
 
 
-class _StubCompany:
+class _StubPosition:
     id = "meridian"
     organization_id = "org-meridian"
     team_id = "team-meridian"
@@ -187,7 +187,7 @@ async def test_run_match_returns_fit_profile(db_session):
         profile = await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -204,7 +204,7 @@ async def test_run_match_dimensional_fit_keys(db_session):
         profile = await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -218,7 +218,7 @@ async def test_run_match_rollout_summaries(db_session):
         profile = await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -233,7 +233,7 @@ async def test_run_match_no_team_raises_409(db_session):
         await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(has_team=False),
+            position=_StubPosition(has_team=False),
             db=db_session,
         )
     assert exc_info.value.status_code == 409
@@ -246,7 +246,7 @@ async def test_run_match_no_scenarios_raises_409(db_session):
         await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(has_scenarios=False),
+            position=_StubPosition(has_scenarios=False),
             db=db_session,
         )
     assert exc_info.value.status_code == 409
@@ -259,7 +259,7 @@ async def test_run_match_includes_baseline_comparison(db_session):
         profile = await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -279,7 +279,7 @@ async def test_run_match_baseline_failure_omits_comparison(db_session):
         profile = await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -293,7 +293,7 @@ async def test_run_match_log_events_written(db_session):
         await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -315,7 +315,7 @@ async def test_run_match_persists_baseline_comparison_row(db_session):
         await run_match(
             match_id="match-001",
             candidate=_StubCandidate(),
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -338,7 +338,7 @@ async def test_run_match_falls_back_to_legacy_persona(db_session):
         profile = await run_match(
             match_id="match-002",
             candidate=candidate,
-            company=_StubCompany(),
+            position=_StubPosition(),
             db=db_session,
             k_per_scenario=1,
         )
@@ -376,7 +376,7 @@ async def test_run_match_raises_when_no_criteria_scores(db_session):
             await run_match(
                 match_id="match-empty",
                 candidate=_StubCandidate(),
-                company=_StubCompany(),
+                position=_StubPosition(),
                 db=db_session,
                 k_per_scenario=1,
             )

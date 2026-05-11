@@ -58,7 +58,7 @@ HARD RULES:
 """
 
 KNOWLEDGE_GRAPH_USER_TEMPLATE = """\
-Build the knowledge graph for this company.
+Build the knowledge graph for this position.
 
 COMPANY: {company_name}
 ROLE: {role}
@@ -188,14 +188,14 @@ def validate_graph(graph: dict[str, Any]) -> list[str]:
 # Prompt rendering
 # ---------------------------------------------------------------------------
 
-def _render_user_prompt(company: "Position") -> str:
-    org = getattr(company, "organization", None)
-    team = getattr(company, "team", None)
+def _render_user_prompt(position: "Position") -> str:
+    org = getattr(position, "organization", None)
+    team = getattr(position, "team", None)
     return KNOWLEDGE_GRAPH_USER_TEMPLATE.format(
-        company_name=company.name,
-        role=company.role,
+        company_name=position.name,
+        role=position.role,
         artifact_values=(org.mission if org is not None else None) or "(none provided)",
-        artifact_role_spec=company.artifact_role_spec or "(none provided)",
+        artifact_role_spec=position.artifact_role_spec or "(none provided)",
         artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
         artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
     )
@@ -205,15 +205,15 @@ def _render_user_prompt(company: "Position") -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
-async def extract(company: "Position", *, budget: CostBudget) -> dict[str, Any]:
+async def extract(position: "Position", *, budget: CostBudget) -> dict[str, Any]:
     """Extract a knowledge graph from company artifacts.
 
     Returns the KnowledgeGraph dict (nodes + edges). Does not persist to DB —
-    the caller is responsible for writing result to company.knowledge_graph.
+    the caller is responsible for writing result to position.knowledge_graph.
 
     Post-hoc structural warnings are logged at WARNING level but do not raise.
     """
-    user_prompt = _render_user_prompt(company)
+    user_prompt = _render_user_prompt(position)
     result = await tracked_chat_json(
         budget,
         system=KNOWLEDGE_GRAPH_SYSTEM,
@@ -226,7 +226,7 @@ async def extract(company: "Position", *, budget: CostBudget) -> dict[str, Any]:
 
     warnings = validate_graph(result)
     for w in warnings:
-        logger.warning("knowledge_graph[%s]: %s", company.id, w)
+        logger.warning("knowledge_graph[%s]: %s", position.id, w)
 
     return result
 

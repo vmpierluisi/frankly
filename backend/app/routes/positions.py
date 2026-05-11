@@ -1,4 +1,4 @@
-"""Company CRUD + list. Manager-gated."""
+"""Position CRUD + list. Manager-gated."""
 from __future__ import annotations
 
 import re
@@ -14,7 +14,7 @@ from ..db import get_session
 
 router = APIRouter(
     prefix="/positions",
-    tags=["companies"],
+    tags=["positions"],
     dependencies=[Depends(require_manager)],
 )
 
@@ -22,7 +22,7 @@ router = APIRouter(
 # Public list used by candidate-side intake has a separate endpoint below —
 # carved out via inclusion order in main.py.
 @router.get("", response_model=list[schemas.PositionListItem])
-def list_companies(db: Session = Depends(get_session)) -> list[schemas.PositionListItem]:
+def list_positions(db: Session = Depends(get_session)) -> list[schemas.PositionListItem]:
     rows = db.query(models.Position).order_by(models.Position.name).all()
     out: list[schemas.PositionListItem] = []
     for c in rows:
@@ -35,7 +35,7 @@ def list_companies(db: Session = Depends(get_session)) -> list[schemas.PositionL
 
 
 @router.post("", response_model=schemas.PositionOut, status_code=status.HTTP_201_CREATED)
-def create_company(
+def create_position(
     payload: schemas.PositionIn,
     db: Session = Depends(get_session),
 ) -> schemas.PositionOut:
@@ -43,17 +43,17 @@ def create_company(
     if db.get(models.Position, position_id) is not None:
         raise HTTPException(
             status_code=409,
-            detail=f"Company id '{position_id}' already exists.",
+            detail=f"Position id '{position_id}' already exists.",
         )
 
-    # Build the Company under an Organization → Team. If ``team_id`` is
+    # Build the Position under an Organization → Team. If ``team_id`` is
     # supplied, attach to that team. Otherwise the legacy artefact_* fields
     # on the payload (still posted by the old TemplateSetup pre-#2d UI) are
     # used to spin up a fresh Org + Team here, explicitly. The previous
-    # version of this branch relied on a back-compat ``Company.__init__``
+    # version of this branch relied on a back-compat ``Position.__init__``
     # that absorbed those kwargs; PR #2d.4.b moves the absorption out of the
     # model and into this single call site so the model stays clean.
-    company_kwargs: dict = dict(
+    position_kwargs: dict = dict(
         id=position_id,
         name=payload.name,
         role=payload.role,
@@ -69,8 +69,8 @@ def create_company(
             raise HTTPException(
                 status_code=404, detail=f"Team {payload.team_id} not found"
             )
-        company_kwargs["team_id"] = team.id
-        company_kwargs["organization_id"] = team.organization_id
+        position_kwargs["team_id"] = team.id
+        position_kwargs["organization_id"] = team.organization_id
     else:
         # Legacy path: spin up an Org + Team from the payload's artefact
         # fields so the new Position has somewhere to live.
@@ -88,11 +88,11 @@ def create_company(
         )
         db.add(team)
         db.flush()  # populate org.id / team.id for the FK assignment below
-        company_kwargs["organization_id"] = org.id
-        company_kwargs["team_id"] = team.id
-    company = models.Position(**company_kwargs)
+        position_kwargs["organization_id"] = org.id
+        position_kwargs["team_id"] = team.id
+    position = models.Position(**position_kwargs)
     for i, crit in enumerate(payload.criteria):
-        company.criteria.append(
+        position.criteria.append(
             models.Criterion(
                 key=crit.key,
                 label=crit.label,
@@ -101,49 +101,49 @@ def create_company(
                 ordering=i,
             )
         )
-    db.add(company)
+    db.add(position)
     db.commit()
-    db.refresh(company)
-    return schemas.PositionOut.model_validate(company)
+    db.refresh(position)
+    return schemas.PositionOut.model_validate(position)
 
 
 @router.get("/{position_id}", response_model=schemas.PositionOut)
-def get_company(
+def get_position(
     position_id: str,
     db: Session = Depends(get_session),
 ) -> schemas.PositionOut:
-    company = db.get(models.Position, position_id)
-    if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
-    return schemas.PositionOut.model_validate(company)
+    position = db.get(models.Position, position_id)
+    if position is None:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return schemas.PositionOut.model_validate(position)
 
 
 @router.put("/{position_id}", response_model=schemas.PositionOut)
-def update_company(
+def update_position(
     position_id: str,
     payload: schemas.PositionIn,
     db: Session = Depends(get_session),
 ) -> schemas.PositionOut:
-    company = db.get(models.Position, position_id)
-    if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
+    position = db.get(models.Position, position_id)
+    if position is None:
+        raise HTTPException(status_code=404, detail="Position not found")
 
     # PR #2d: position-level fields only. Org / team artefacts are edited
     # via /organizations/{id} and /teams/{id} respectively. Legacy artifact_*
     # fields on the payload are silently ignored.
-    company.name = payload.name
-    company.role = payload.role
-    company.role_family = payload.role_family
-    company.target_seniority = payload.target_seniority
-    company.is_open = payload.is_open
-    company.artifact_role_spec = payload.artifact_role_spec
-    company.required_skills = [s.model_dump() for s in payload.required_skills]
+    position.name = payload.name
+    position.role = payload.role
+    position.role_family = payload.role_family
+    position.target_seniority = payload.target_seniority
+    position.is_open = payload.is_open
+    position.artifact_role_spec = payload.artifact_role_spec
+    position.required_skills = [s.model_dump() for s in payload.required_skills]
 
     # Replace the criteria set wholesale. (The manager approves criteria as a
     # batch during template setup, so partial mutation isn't a v0 need.)
-    company.criteria.clear()
+    position.criteria.clear()
     for i, crit in enumerate(payload.criteria):
-        company.criteria.append(
+        position.criteria.append(
             models.Criterion(
                 key=crit.key,
                 label=crit.label,
@@ -153,24 +153,24 @@ def update_company(
             )
         )
     db.commit()
-    db.refresh(company)
-    return schemas.PositionOut.model_validate(company)
+    db.refresh(position)
+    return schemas.PositionOut.model_validate(position)
 
 
 @router.delete("/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_company(
+def delete_position(
     position_id: str,
     db: Session = Depends(get_session),
 ) -> None:
-    company = db.get(models.Position, position_id)
-    if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
-    db.delete(company)
+    position = db.get(models.Position, position_id)
+    if position is None:
+        raise HTTPException(status_code=404, detail="Position not found")
+    db.delete(position)
     db.commit()
 
 
 # ---------------------------------------------------------------------------
-# GET /companies/{position_id}/leaderboard
+# GET /positions/{position_id}/leaderboard
 # ---------------------------------------------------------------------------
 
 @router.get("/{position_id}/leaderboard", response_model=schemas.LeaderboardOut)
@@ -178,10 +178,10 @@ def get_leaderboard(
     position_id: str,
     db: Session = Depends(get_session),
 ) -> schemas.LeaderboardOut:
-    """Return all Match rows for a company ordered by status then overall_score."""
-    company = db.get(models.Position, position_id)
-    if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
+    """Return all Match rows for a position ordered by status then overall_score."""
+    position = db.get(models.Position, position_id)
+    if position is None:
+        raise HTTPException(status_code=404, detail="Position not found")
 
     matches = db.execute(
         select(models.Match, models.Candidate)
@@ -200,13 +200,13 @@ def get_leaderboard(
     # peers and the last had all of them. Percentile written into the
     # response payload only; the stored report is unchanged.
     peer_scores: list[int] | None = None
-    if company.role_family:
+    if position.role_family:
         peer_scores = db.execute(
             select(models.Match.overall_score)
             .join(models.Position, models.Position.id == models.Match.position_id)
             .where(
                 models.Match.status == "succeeded",
-                models.Position.role_family == company.role_family,
+                models.Position.role_family == position.role_family,
             )
         ).scalars().all()
 
@@ -224,7 +224,7 @@ def get_leaderboard(
                 report["percentile"] = {
                     "percentile": pct,
                     "sample_size": len(others),
-                    "role_family": company.role_family,
+                    "role_family": position.role_family,
                 }
         rows.append(
             schemas.LeaderboardRow(
@@ -253,14 +253,14 @@ def get_leaderboard(
         )
 
     return schemas.LeaderboardOut(
-        position_id=company.id,
-        company_name=company.name,
-        role=company.role,
-        role_family=company.role_family,
-        target_seniority=company.target_seniority,
-        is_open=company.is_open,
+        position_id=position.id,
+        company_name=position.name,
+        role=position.role,
+        role_family=position.role_family,
+        target_seniority=position.target_seniority,
+        is_open=position.is_open,
         reliability_audit_enabled=bool(
-            getattr(getattr(company, "organization", None), "reliability_audit_enabled", False)
+            getattr(getattr(position, "organization", None), "reliability_audit_enabled", False)
         ),
         results=rows,
     )
@@ -269,4 +269,4 @@ def get_leaderboard(
 # ---------------------------------------------------------------------------
 def _slugify(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return s[:60] or "company"
+    return s[:60] or "position"

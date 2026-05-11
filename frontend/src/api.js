@@ -167,36 +167,36 @@ export const matches = {
 
 // ---------- Scenario library ----------
 export const scenarios = {
-  list: (companyId) =>
-    request(`/positions/${companyId}/scenarios`, { auth: true }),
-  draft: (companyId) =>
-    request(`/positions/${companyId}/scenarios/draft`, { method: "POST", auth: true }),
-  create: (companyId, payload) =>
-    request(`/positions/${companyId}/scenarios`, { method: "POST", body: payload, auth: true }),
-  update: (companyId, scenarioId, payload) =>
-    request(`/positions/${companyId}/scenarios/${scenarioId}`, {
+  list: (positionId) =>
+    request(`/positions/${positionId}/scenarios`, { auth: true }),
+  draft: (positionId) =>
+    request(`/positions/${positionId}/scenarios/draft`, { method: "POST", auth: true }),
+  create: (positionId, payload) =>
+    request(`/positions/${positionId}/scenarios`, { method: "POST", body: payload, auth: true }),
+  update: (positionId, scenarioId, payload) =>
+    request(`/positions/${positionId}/scenarios/${scenarioId}`, {
       method: "PATCH", body: payload, auth: true,
     }),
-  remove: (companyId, scenarioId) =>
-    request(`/positions/${companyId}/scenarios/${scenarioId}`, {
+  remove: (positionId, scenarioId) =>
+    request(`/positions/${positionId}/scenarios/${scenarioId}`, {
       method: "DELETE", auth: true, raw: true,
     }),
 };
 
 // ---------- Synthetic team ----------
 export const team = {
-  list: (companyId) =>
-    request(`/positions/${companyId}/team`, { auth: true }),
-  synthesize: (companyId) =>
-    request(`/positions/${companyId}/team/synthesize`, { method: "POST", auth: true }),
-  update: (companyId, teammateId, payload) =>
-    request(`/positions/${companyId}/team/${teammateId}`, {
+  list: (positionId) =>
+    request(`/positions/${positionId}/team`, { auth: true }),
+  synthesize: (positionId) =>
+    request(`/positions/${positionId}/team/synthesize`, { method: "POST", auth: true }),
+  update: (positionId, teammateId, payload) =>
+    request(`/positions/${positionId}/team/${teammateId}`, {
       method: "PATCH",
       body: payload,
       auth: true,
     }),
-  remove: (companyId, teammateId) =>
-    request(`/positions/${companyId}/team/${teammateId}`, {
+  remove: (positionId, teammateId) =>
+    request(`/positions/${positionId}/team/${teammateId}`, {
       method: "DELETE",
       auth: true,
       raw: true,

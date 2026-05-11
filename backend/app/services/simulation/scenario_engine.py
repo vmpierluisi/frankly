@@ -57,7 +57,7 @@ HARD RULES:
 """
 
 SCENARIO_DRAFTER_USER_TEMPLATE = """\
-Draft the scenario library for this company.
+Draft the scenario library for this position.
 
 COMPANY: {company_name}
 ROLE: {role}
@@ -108,7 +108,7 @@ SCENARIO_LIBRARY_SCHEMA: dict[str, Any] = {
                     "expected_arc":   {"type": "string", "description": "What 'good' looks like on this team."},
                     "scoring_dims": {
                         "type": "array",
-                        "items": {"type": "string", "description": "Exact criterion key from the company."},
+                        "items": {"type": "string", "description": "Exact criterion key from the position."},
                     },
                     "participating_roles": {
                         "type": "array",
@@ -159,10 +159,10 @@ class WorldState:
 
 def validate_scoring_dims(
     scoring_dims: list[str],
-    company: "Position",
+    position: "Position",
 ) -> list[str]:
     """Return list of scoring_dims keys that do NOT match any company criterion."""
-    valid_keys = {c.key for c in getattr(company, "criteria", [])}
+    valid_keys = {c.key for c in getattr(position, "criteria", [])}
     return [k for k in scoring_dims if k not in valid_keys]
 
 
@@ -170,15 +170,15 @@ def validate_scoring_dims(
 # Prompt rendering helpers
 # ---------------------------------------------------------------------------
 
-def _render_drafter_user_prompt(company: "Position") -> str:
-    org = getattr(company, "organization", None)
-    team = getattr(company, "team", None)
+def _render_drafter_user_prompt(position: "Position") -> str:
+    org = getattr(position, "organization", None)
+    team = getattr(position, "team", None)
     return SCENARIO_DRAFTER_USER_TEMPLATE.format(
-        company_name=company.name,
-        role=company.role,
-        criteria_block=_render_criteria_block(company),
+        company_name=position.name,
+        role=position.role,
+        criteria_block=_render_criteria_block(position),
         artifact_values=(org.mission if org is not None else None) or "(none provided)",
-        artifact_role_spec=company.artifact_role_spec or "(none provided)",
+        artifact_role_spec=position.artifact_role_spec or "(none provided)",
         artifact_team_structure=(team.artifact_team_structure if team is not None else None) or "(none provided)",
         artifact_sample_comms=(team.artifact_sample_comms if team is not None else None) or "(none provided)",
         knowledge_graph_summary=summarize_for_prompt(
@@ -192,7 +192,7 @@ def _render_drafter_user_prompt(company: "Position") -> str:
 # ---------------------------------------------------------------------------
 
 async def draft_scenarios(
-    company: "Position",
+    position: "Position",
     *,
     budget: CostBudget,
 ) -> "list[MomentOfTruth]":
@@ -205,7 +205,7 @@ async def draft_scenarios(
     """
     from ...models import MomentOfTruth  # deferred to avoid circular import
 
-    user_prompt = _render_drafter_user_prompt(company)
+    user_prompt = _render_drafter_user_prompt(position)
     result = await tracked_chat_json(
         budget,
         system=SCENARIO_DRAFTER_SYSTEM,
@@ -217,14 +217,14 @@ async def draft_scenarios(
     )
 
     scenarios_raw = result.get("scenarios", [])
-    criterion_keys = {c.key for c in getattr(company, "criteria", [])}
+    criterion_keys = {c.key for c in getattr(position, "criteria", [])}
     scenarios: list[MomentOfTruth] = []
 
     for i, raw in enumerate(scenarios_raw):
         # Filter scoring_dims to only valid criterion keys (soft guard).
         valid_dims = [k for k in raw.get("scoring_dims", []) if k in criterion_keys]
         mot = MomentOfTruth(
-            team_id=company.team_id,
+            team_id=position.team_id,
             title=raw["title"],
             scenario_type=raw["type"],
             prompt=raw["prompt"],
@@ -241,7 +241,7 @@ async def draft_scenarios(
 
     logger.info(
         "draft_scenarios[%s]: drafted %d scenarios (budget spent=%.4f usd)",
-        company.id, len(scenarios), budget.spent_usd,
+        position.id, len(scenarios), budget.spent_usd,
     )
     return scenarios
 

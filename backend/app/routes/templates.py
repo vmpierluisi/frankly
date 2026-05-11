@@ -41,7 +41,7 @@ async def extract_criteria_route(
     """Return 5-7 LLM-suggested criteria for the given artifacts.
 
     Role is passed as a query parameter because it's short context for the LLM
-    but doesn't belong on the Company row until save.
+    but doesn't belong on the Position row until save.
     """
     artifact_text = " ".join([
         payload.artifact_values,

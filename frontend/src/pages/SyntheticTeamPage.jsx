@@ -6,10 +6,10 @@ import { GeneratingScreen } from "../components/Widgets.jsx";
 import TeammateCard from "../components/TeammateCard.jsx";
 
 // Manager page: view and manage the synthetic team for a company.
-// Route: /manager/companies/:companyId/team
+// Route: /manager/companies/:positionId/team
 
 export default function SyntheticTeamPage() {
-  const { companyId } = useParams();
+  const { positionId } = useParams();
   const nav = useNavigate();
 
   const [company, setCompany] = useState(null);
@@ -20,8 +20,8 @@ export default function SyntheticTeamPage() {
 
   useEffect(() => {
     Promise.all([
-      positions.get(companyId),
-      team.list(companyId),
+      positions.get(positionId),
+      team.list(positionId),
     ])
       .then(([co, tm]) => {
         setCompany(co);
@@ -29,13 +29,13 @@ export default function SyntheticTeamPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [companyId]);
+  }, [positionId]);
 
   async function handleSynthesize() {
     setError("");
     setSynthesizing(true);
     try {
-      const result = await team.synthesize(companyId);
+      const result = await team.synthesize(positionId);
       setTeammates(result);
     } catch (e) {
       setError(`Synthesis failed: ${e.message}`);
@@ -45,17 +45,17 @@ export default function SyntheticTeamPage() {
   }
 
   const handleUpdate = useCallback(async (teammateId, payload) => {
-    const updated = await team.update(companyId, teammateId, payload);
+    const updated = await team.update(positionId, teammateId, payload);
     setTeammates((prev) =>
       prev.map((t) => (t.id === teammateId ? updated : t))
     );
     return updated;
-  }, [companyId]);
+  }, [positionId]);
 
   const handleDelete = useCallback(async (teammateId) => {
-    await team.remove(companyId, teammateId);
+    await team.remove(positionId, teammateId);
     setTeammates((prev) => prev.filter((t) => t.id !== teammateId));
-  }, [companyId]);
+  }, [positionId]);
 
   if (loading) return <GeneratingScreen note="Loading team…" />;
 
@@ -73,7 +73,7 @@ export default function SyntheticTeamPage() {
           Manager
         </button>
         <span style={{ color: COLORS.rule }}>›</span>
-        <span>{company?.name || companyId}</span>
+        <span>{company?.name || positionId}</span>
         <span style={{ color: COLORS.rule }}>›</span>
         <span>Synthetic Team</span>
       </div>
@@ -102,7 +102,7 @@ export default function SyntheticTeamPage() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             className="ghost"
-            onClick={() => nav(`/manager/positions/${companyId}/scenarios`)}
+            onClick={() => nav(`/manager/positions/${positionId}/scenarios`)}
             style={{ padding: "12px 20px" }}
           >
             Scenarios →
@@ -181,7 +181,7 @@ export default function SyntheticTeamPage() {
                 <TeammateCard
                   key={t.id}
                   teammate={t}
-                  companyId={companyId}
+                  positionId={positionId}
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
                 />

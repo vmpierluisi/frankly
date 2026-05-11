@@ -21,7 +21,7 @@ router = APIRouter(
 def _get_company_or_404(position_id: str, db: Session) -> models.Position:
     company = db.get(models.Position, position_id)
     if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Position not found")
     return company
 
 

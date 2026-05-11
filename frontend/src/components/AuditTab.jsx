@@ -19,7 +19,7 @@ import { ReliabilitySection, FairnessSection, Empty } from "./AuditCharts.jsx";
  * whether any org has the audit toggle on — if none, we render an
  * empty-state pointing the recruiter to Org Settings.
  */
-export default function AuditTab({ companyList = [], initialScope, initialPositionId, onScopeChange }) {
+export default function AuditTab({ positionList = [], initialScope, initialPositionId, onScopeChange }) {
   const [scope, setScope] = useState(initialScope || "all");
   const [positionId, setPositionId] = useState(initialPositionId || "");
   const [reliability, setReliability] = useState(null);
@@ -29,7 +29,7 @@ export default function AuditTab({ companyList = [], initialScope, initialPositi
   // The positions list already carries the org-level toggle (see
   // backend/app/routes/positions.py::list_companies). Filter to the
   // audit-enabled positions; if none, render an empty state.
-  const eligiblePositions = (companyList || []).filter(
+  const eligiblePositions = (positionList || []).filter(
     (p) => p.reliability_audit_enabled,
   );
   const auditOnAnywhere = eligiblePositions.length > 0;

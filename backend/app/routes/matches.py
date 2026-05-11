@@ -38,7 +38,7 @@ def trigger_match(
         raise HTTPException(status_code=404, detail="Candidate not found")
     company = db.get(models.Position, payload.position_id)
     if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Position not found")
 
     existing = db.execute(
         select(models.Match)

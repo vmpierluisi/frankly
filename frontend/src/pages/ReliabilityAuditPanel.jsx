@@ -8,13 +8,13 @@ import { useParams, useNavigate } from "react-router-dom";
  * the shared ``components/AuditCharts.jsx`` primitives.
  */
 export default function ReliabilityAuditPanel() {
-  const { companyId } = useParams();
+  const { positionId } = useParams();
   const nav = useNavigate();
   useEffect(() => {
     nav(
-      `/manager?tab=audit&scope=position&positionId=${encodeURIComponent(companyId)}`,
+      `/manager?tab=audit&scope=position&positionId=${encodeURIComponent(positionId)}`,
       { replace: true },
     );
-  }, [companyId, nav]);
+  }, [positionId, nav]);
   return null;
 }

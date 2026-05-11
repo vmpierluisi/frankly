@@ -1,10 +1,10 @@
 """Organization endpoints — Roadmap 2 / PR #2d.
 
 An Organization sits at the top of the three-tier hierarchy:
-    Organization → Team → Position (= Company in code).
+    Organization → Team → Position.
 
 Owns culture artefacts (mission, code_of_conduct, tagline, name) that
-were previously duplicated across each per-vacancy Company row.
+were previously duplicated across each per-vacancy Position row.
 """
 from __future__ import annotations
 

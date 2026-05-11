@@ -22,18 +22,18 @@ const ARTIFACT_FIELDS = [
 
 export default function TemplateSetup() {
   const nav = useNavigate();
-  const { companyId } = useParams();
+  const { positionId } = useParams();
   const [searchParams] = useSearchParams();
   // PR #2d.2 — when a team_id is supplied, this is a position-creation flow
   // under that team; org-level + team-level fields are hidden because they
   // already live on the parent Org/Team.
   const teamIdParam = searchParams.get("team_id") || null;
-  const positionOnly = !!teamIdParam || !!companyId;
+  const positionOnly = !!teamIdParam || !!positionId;
 
   // Roadmap 2 / PR #2d.2: position creation must happen under an existing
   // team. We no longer support the bare "/manager/templates" no-context flow
   // — it leaked org-level + team-level fields into per-vacancy forms.
-  const missingContext = !companyId && !teamIdParam;
+  const missingContext = !positionId && !teamIdParam;
 
   const [form, setForm] = useState({
     id: "",
@@ -60,10 +60,10 @@ export default function TemplateSetup() {
 
   // Load existing company if editing.
   useEffect(() => {
-    if (!companyId) return;
+    if (!positionId) return;
     setLoading(true);
     companies
-      .get(companyId)
+      .get(positionId)
       .then((c) => {
         setForm({
           id: c.id,
@@ -90,13 +90,13 @@ export default function TemplateSetup() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [companyId]);
+  }, [positionId]);
 
   // PR #2d.2: when creating a position under a team, prefill the position's
   // Name from the parent organization's name. The Name field is then locked
   // in the UI — recruiters edit org names from Settings, not here.
   useEffect(() => {
-    if (!teamIdParam || companyId) return;
+    if (!teamIdParam || positionId) return;
     let cancelled = false;
     teams
       .get(teamIdParam)
@@ -109,7 +109,7 @@ export default function TemplateSetup() {
     return () => {
       cancelled = true;
     };
-  }, [teamIdParam, companyId]);
+  }, [teamIdParam, positionId]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -199,8 +199,8 @@ export default function TemplateSetup() {
       })),
     };
     try {
-      const saved = companyId
-        ? await positions.update(companyId, payload)
+      const saved = positionId
+        ? await positions.update(positionId, payload)
         : await positions.create(payload);
       nav(`/manager`, { state: { savedCompany: saved.id } });
     } catch (e) {
@@ -246,7 +246,7 @@ export default function TemplateSetup() {
   return (
     <main className="container">
       <div className="label-mono" style={{ marginBottom: 12 }}>
-        Manager · {companyId ? "Edit template" : "New template"}
+        Manager · {positionId ? "Edit template" : "New template"}
       </div>
       <h2
         style={{

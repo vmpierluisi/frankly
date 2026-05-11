@@ -145,15 +145,3 @@ def _generate_narrative(bf: dict[str, float], sjt: dict[str, float]) -> str:
     return f"A candidate who is {head}, and {bits[-1]}."
 
 
-# ---------------------------------------------------------------------------
-# Helper: convert internal persona (camelCase, as in JSX) to snake_case for
-# Pydantic response models. Matching LLM prompts still take the camelCase
-# shape because that's what the JSX-era prompt expects.
-# ---------------------------------------------------------------------------
-def persona_to_snake(persona: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "big_five": persona["bigFive"],
-        "sjt_signals": persona["sjtSignals"],
-        "inconsistencies": persona["inconsistencies"],
-        "narrative": persona["narrative"],
-    }
