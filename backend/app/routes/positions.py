@@ -24,7 +24,14 @@ router = APIRouter(
 @router.get("", response_model=list[schemas.PositionListItem])
 def list_companies(db: Session = Depends(get_session)) -> list[schemas.PositionListItem]:
     rows = db.query(models.Position).order_by(models.Position.name).all()
-    return [schemas.PositionListItem.model_validate(c) for c in rows]
+    out: list[schemas.PositionListItem] = []
+    for c in rows:
+        item = schemas.PositionListItem.model_validate(c)
+        item.reliability_audit_enabled = bool(
+            getattr(getattr(c, "organization", None), "reliability_audit_enabled", False)
+        )
+        out.append(item)
+    return out
 
 
 @router.post("", response_model=schemas.PositionOut, status_code=status.HTTP_201_CREATED)
@@ -252,6 +259,9 @@ def get_leaderboard(
         role_family=company.role_family,
         target_seniority=company.target_seniority,
         is_open=company.is_open,
+        reliability_audit_enabled=bool(
+            getattr(getattr(company, "organization", None), "reliability_audit_enabled", False)
+        ),
         results=rows,
     )
 

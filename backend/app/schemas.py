@@ -91,6 +91,8 @@ class CandidateMeOut(BaseModel):
     # Job targets — set during intake; editable from Settings tab.
     target_role_family: str | None = None
     target_seniority: str | None = None
+    # PR #6 — opt-in self-reported demographics for the Fairness audit panel.
+    demographics: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
     persona: PersonaSummary | None = None
@@ -105,6 +107,8 @@ class CandidateMePatchIn(BaseModel):
     # Roadmap 2 / PR #2b.1 — let candidates change job targets after intake.
     target_role_family: str | None = None
     target_seniority: str | None = None
+    # PR #6 — opt-in. Shape: {"gender": str, "age_band": str, "education_tier": str}.
+    demographics: dict[str, Any] | None = None
 
 
 class VerifiedProfileOut(BaseModel):
@@ -203,6 +207,8 @@ class OrganizationPatch(BaseModel):
     tagline: str | None = None
     mission: str | None = None
     code_of_conduct: str | None = None
+    # PR #6 — recruiter toggle for the Reliability + Fairness audit panel.
+    reliability_audit_enabled: bool | None = None
 
 
 class OrganizationOut(BaseModel):
@@ -213,6 +219,7 @@ class OrganizationOut(BaseModel):
     tagline: str | None = None
     mission: str = ""
     code_of_conduct: str = ""
+    reliability_audit_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -329,6 +336,9 @@ class PositionListItem(BaseModel):
     role_family: str | None = None
     target_seniority: str | None = None
     is_open: bool = True
+    # PR #6 follow-up — surfaced so the Audit tab can populate the picker
+    # only with vacancies whose org has the toggle on.
+    reliability_audit_enabled: bool = False
 
 
 # ----------------------------------------------------------------------------
@@ -463,6 +473,9 @@ class LeaderboardOut(BaseModel):
     role_family: str | None = None
     target_seniority: str | None = None
     is_open: bool
+    # PR #6 — surface the org-level Reliability + Fairness audit toggle so
+    # the recruiter UI can conditionally render the audit entry-point.
+    reliability_audit_enabled: bool = False
     results: list[LeaderboardRow]
 
 

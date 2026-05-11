@@ -116,11 +116,13 @@ function OrgIdentityCard({ org, saving, onSave }) {
   const [tagline, setTagline] = useState(org.tagline || "");
   const [mission, setMission] = useState(org.mission || "");
   const [code, setCode] = useState(org.code_of_conduct || "");
+  const [auditOn, setAuditOn] = useState(!!org.reliability_audit_enabled);
   const dirty =
     name !== org.name ||
     tagline !== (org.tagline || "") ||
     mission !== (org.mission || "") ||
-    code !== (org.code_of_conduct || "");
+    code !== (org.code_of_conduct || "") ||
+    auditOn !== !!org.reliability_audit_enabled;
 
   return (
     <section className="card" style={{ marginBottom: 28 }}>
@@ -155,6 +157,17 @@ function OrgIdentityCard({ org, saving, onSave }) {
         />
       </Field>
 
+      <Field label="Reliability + Fairness audit">
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 14, color: COLORS.muted }}>
+          <input
+            type="checkbox"
+            checked={auditOn}
+            onChange={(e) => setAuditOn(e.target.checked)}
+          />
+          Enable the recruiter-only audit panel for this organization.
+        </label>
+      </Field>
+
       {dirty && (
         <button
           className="primary"
@@ -165,6 +178,7 @@ function OrgIdentityCard({ org, saving, onSave }) {
               tagline: tagline || null,
               mission,
               code_of_conduct: code,
+              reliability_audit_enabled: auditOn,
             })
           }
         >

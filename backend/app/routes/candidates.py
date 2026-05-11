@@ -88,6 +88,7 @@ def update_me(
         "cv_path",
         "target_role_family",
         "target_seniority",
+        "demographics",
     ):
         val = getattr(payload, field)
         if val is not None:
@@ -550,6 +551,7 @@ def _to_me_out(candidate: models.Candidate) -> schemas.CandidateMeOut:
         profile_accuracy_score=candidate.profile_accuracy_score or 0,
         target_role_family=candidate.target_role_family,
         target_seniority=candidate.target_seniority,
+        demographics=candidate.demographics or None,
         created_at=candidate.created_at,
         updated_at=candidate.updated_at,
         persona=_persona(candidate),

@@ -96,6 +96,11 @@ class Candidate(Base):
         Integer, nullable=False, default=0
     )
 
+    # Roadmap 2 / PR #6 — opt-in, self-reported demographics. Used only by
+    # the recruiter-side Fairness audit panel. None / empty dict by default;
+    # never inferred. Shape: {"gender": str, "age_band": str, "education_tier": str}.
+    demographics: Mapped[dict | None] = mapped_column(JSON, default=None, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow
@@ -168,6 +173,11 @@ class Organization(Base):
     tagline: Mapped[str | None] = mapped_column(String(500), default=None)
     mission: Mapped[str] = mapped_column(Text, nullable=False, default="")
     code_of_conduct: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Roadmap 2 / PR #6 — feature flag for the Reliability + Fairness audit
+    # surface. Toggled from Org Settings; audit endpoints 403 when false.
+    reliability_audit_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utcnow, onupdate=_utcnow

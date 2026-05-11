@@ -28,6 +28,7 @@ export default defineConfig({
       "/interviews": backendUrl,
       "/notifications": backendUrl,
       "/calibration": backendUrl,
+      "/audit": backendUrl,
     },
   },
 });

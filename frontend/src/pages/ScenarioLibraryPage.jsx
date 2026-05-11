@@ -48,6 +48,22 @@ export default function ScenarioLibraryPage() {
       .finally(() => setLoading(false));
   }, [companyId]);
 
+  // PR #6 follow-up — scroll to the scenario from the audit panel deep-link
+  // (#scenario-<id> in the URL). Runs once scenarios have rendered.
+  useEffect(() => {
+    if (loading || scenarioList.length === 0) return;
+    const hash = window.location.hash || "";
+    const m = hash.match(/^#(?:scenario-)?([\w-]+)$/);
+    if (!m) return;
+    const el = document.getElementById(`scenario-${m[1]}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.outline = "2px solid #111";
+      el.style.outlineOffset = "4px";
+      setTimeout(() => { el.style.outline = ""; }, 1800);
+    }
+  }, [loading, scenarioList]);
+
   const criteriaIndex = company
     ? Object.fromEntries(company.criteria.map((c) => [c.key, { label: c.label, weight: c.weight }]))
     : {};
@@ -205,13 +221,14 @@ export default function ScenarioLibraryPage() {
               .slice()
               .sort((a, b) => a.ordering - b.ordering)
               .map((s) => (
-                <ScenarioCard
-                  key={s.id}
-                  scenario={s}
-                  criteriaIndex={criteriaIndex}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                />
+                <div key={s.id} id={`scenario-${s.id}`}>
+                  <ScenarioCard
+                    scenario={s}
+                    criteriaIndex={criteriaIndex}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                  />
+                </div>
               ))}
           </div>
           <div style={{ marginTop: 28, padding: "14px 0", borderTop: `1px solid ${COLORS.rule}`, color: COLORS.muted, fontSize: 13, fontStyle: "italic" }}>

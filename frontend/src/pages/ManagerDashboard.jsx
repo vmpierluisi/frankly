@@ -8,10 +8,12 @@ import Tabs from "../components/Tabs.jsx";
 import KebabMenu from "../components/KebabMenu.jsx";
 import NewPositionModal from "../components/NewPositionModal.jsx";
 import NotificationBell from "../components/NotificationBell.jsx";
+import AuditTab from "../components/AuditTab.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "positions", label: "Positions" },
+  { id: "audit", label: "Audit" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -143,6 +145,23 @@ export default function ManagerDashboard() {
           selectedCompany={selectedCompany}
           setSelectedCompany={setSelectedCompany}
           company={company}
+        />
+      )}
+
+      {tab === "audit" && (
+        <AuditTab
+          companyList={companyList}
+          initialScope={searchParams.get("scope") || "all"}
+          initialPositionId={searchParams.get("positionId") || ""}
+          onScopeChange={({ scope, positionId }) => {
+            const params = new URLSearchParams(searchParams);
+            params.set("tab", "audit");
+            if (scope === "all") params.delete("scope");
+            else params.set("scope", scope);
+            if (positionId) params.set("positionId", positionId);
+            else params.delete("positionId");
+            setSearchParams(params, { replace: true });
+          }}
         />
       )}
 

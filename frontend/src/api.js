@@ -247,6 +247,23 @@ export const notifications = {
     request(`/notifications/${id}/dismiss`, { method: "POST", auth: true }),
 };
 
+// ---------- Audit panel (Roadmap 2 / PR #6) ----------
+export const audit = {
+  reliability: (positionId) =>
+    request(`/audit/positions/${positionId}/reliability`, { auth: true }),
+  fairness: (positionId) =>
+    request(`/audit/positions/${positionId}/fairness`, { auth: true }),
+  exportCsvUrl: (positionId) =>
+    `${BASE}/audit/positions/${positionId}/export.csv`,
+  // PR #6 follow-up — multi-position overview.
+  reliabilityOverview: (scope = "all") =>
+    request(`/audit/overview/reliability?scope=${encodeURIComponent(scope)}`, { auth: true }),
+  fairnessOverview: (scope = "all") =>
+    request(`/audit/overview/fairness?scope=${encodeURIComponent(scope)}`, { auth: true }),
+  exportOverviewCsvUrl: (scope = "all") =>
+    `${BASE}/audit/overview/export.csv?scope=${encodeURIComponent(scope)}`,
+};
+
 // ---------- Calibration (Roadmap 2 / PR #5) ----------
 export const calibration = {
   list: () => request("/calibration", { auth: true }),

@@ -11,6 +11,7 @@ from .config import settings
 from .db import SessionLocal, init_db
 from .routes import (
     admin,
+    audit,
     calibration,
     candidates,
     interviews,
@@ -94,3 +95,4 @@ app.include_router(teams.router)
 app.include_router(interviews.router)
 app.include_router(notifications.router)
 app.include_router(calibration.router)
+app.include_router(audit.router)
