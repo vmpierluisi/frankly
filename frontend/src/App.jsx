@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, GLOBAL_CSS } from "./design.js";
 import { setSessionGetter } from "./api.js";
 import { useAuth } from "./lib/auth.js";
@@ -15,6 +15,8 @@ import TranscriptViewer from "./pages/TranscriptViewer.jsx";
 import OrganizationSettings from "./pages/OrganizationSettings.jsx";
 import TeamDetail from "./pages/TeamDetail.jsx";
 import ReliabilityAuditPanel from "./pages/ReliabilityAuditPanel.jsx";
+import ShortlistComparePage from "./pages/ShortlistComparePage.jsx";
+import TriageQueuePage from "./pages/TriageQueuePage.jsx";
 import Login from "./pages/Login.jsx";
 
 // Wire the session getter into the API module once at startup.
@@ -89,6 +91,27 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* Manager Shortlist V7 — primary landing for a position. */}
+        <Route
+          path="/manager/positions/:positionId"
+          element={<PositionRootRedirect />}
+        />
+        <Route
+          path="/manager/positions/:positionId/shortlist"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <ShortlistComparePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/manager/positions/:positionId/triage"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <TriageQueuePage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/manager/positions/:positionId/team"
           element={
@@ -145,6 +168,12 @@ export default function App() {
       <Footer />
     </>
   );
+}
+
+// /manager/positions/:positionId → its shortlist (V7 default landing).
+function PositionRootRedirect() {
+  const { positionId } = useParams();
+  return <Navigate to={`/manager/positions/${positionId}/shortlist`} replace />;
 }
 
 function RootRedirect({ auth }) {

@@ -248,6 +248,7 @@ def _build_candidate(
     score = int(match.overall_score or report.get("overallScore") or 0)
     return {
         "id": candidate.id,
+        "match_id": match.id,
         "name": candidate.display_name or "Candidate",
         "anchor": candidate.display_name or "Candidate",
         "anchor_short": candidate.display_name or "Candidate",

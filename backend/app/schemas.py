@@ -772,6 +772,7 @@ class ScenarioResponse(BaseModel):
 
 class CandidateInReport(BaseModel):
     id: str
+    match_id: str = ""
     name: str
     anchor: str = ""
     anchor_short: str = ""
