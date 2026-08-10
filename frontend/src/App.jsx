@@ -164,8 +164,8 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
-      <Footer />
+      {/* Footer disclaimer strip dropped per V7 plan §11 (blind-matching /
+          mutual-opt-in are backend invariants, not chrome). */}
     </>
   );
 }
@@ -231,13 +231,12 @@ function Masthead({ auth }) {
       }}
     >
       <div>
-        <div className="label-mono">Screening Instrument · v0</div>
+        {/* Demo-only "Screening Instrument · v0" sub-label dropped per V7 plan §11. */}
         <div
           style={{
             fontFamily: FONT_DISPLAY,
             fontSize: 32,
             fontWeight: 500,
-            marginTop: 4,
             letterSpacing: "-0.01em",
           }}
         >
@@ -276,22 +275,3 @@ function Masthead({ auth }) {
   );
 }
 
-function Footer() {
-  return (
-    <footer
-      style={{
-        borderTop: `1px solid ${COLORS.rule}`,
-        padding: "24px 48px",
-        color: COLORS.muted,
-        fontSize: 13,
-        display: "flex",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 12,
-      }}
-    >
-      <div className="label-mono">Screening signal · Not a decision</div>
-      <div className="label-mono">Blind matching · Mutual opt-in required</div>
-    </footer>
-  );
-}
