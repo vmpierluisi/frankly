@@ -112,6 +112,15 @@ def test_position_context_includes_axes_criteria_skills_team(world_db):
     assert len(report["scenarios"]) == 2
 
 
+def test_criteria_map_to_primary_scenario(world_db):
+    world, db = world_db
+    report = build_shortlist_report("meridian-fa", top_n=3, session=db)
+    crit_by_id = {c["id"]: c for c in report["position"]["criteria"]}
+    # honesty is scored in the asterisk scenario; rigor in the model_gap.
+    assert crit_by_id["honesty"]["scenario_id"] == world["scenarios"]["asterisk"].id
+    assert crit_by_id["rigor"]["scenario_id"] == world["scenarios"]["model_gap"].id
+
+
 def test_unknown_position_raises(world_db):
     _, db = world_db
     with pytest.raises(LookupError):

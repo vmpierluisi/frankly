@@ -91,14 +91,32 @@ def _skill_id(skill_name: str) -> str:
     ).strip("_")
 
 
+def _scenario_by_dim(position: models.Position) -> dict[str, str]:
+    """{criterion/skill key -> primary scenario id} from scenario scoring_dims.
+
+    A criterion's "primary" scenario is the first (by ordering) scenario whose
+    ``scoring_dims`` lists that criterion key. Powers the CellPopover's
+    "See in scenario" affordance.
+    """
+    team = getattr(position, "team", None)
+    scenarios = sorted(getattr(team, "scenarios", []) or [], key=lambda s: s.ordering)
+    mapping: dict[str, str] = {}
+    for sc in scenarios:
+        for dim in sc.scoring_dims or []:
+            mapping.setdefault(dim, sc.id)
+    return mapping
+
+
 def _build_position_context(position: models.Position) -> dict[str, Any]:
+    dim_scenario = _scenario_by_dim(position)
+
     criteria = [
         {
             "id": c.key,
             "label": c.label,
             "why": c.description or "",
             "weight": float(c.weight or 0.0),
-            "scenario_id": None,
+            "scenario_id": dim_scenario.get(c.key),
         }
         for c in sorted(position.criteria, key=lambda c: c.ordering)
     ]
@@ -108,7 +126,7 @@ def _build_position_context(position: models.Position) -> dict[str, Any]:
             "id": _skill_id(s.get("skill", "")),
             "label": s.get("skill", ""),
             "reason": f"Required at {s.get('level', 'mid')} level",
-            "scenario_id": None,
+            "scenario_id": dim_scenario.get(s.get("skill", "")),
         }
         for s in (position.required_skills or [])
         if s.get("skill")
