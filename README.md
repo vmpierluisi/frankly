@@ -1,71 +1,137 @@
-# Hiring Simulation Platform — v0
+# frankly
 
-A hiring **screening** tool — not a hiring decision tool. Candidates take a
-short psychometric quiz, the system synthesizes a behavioral persona, and that
-persona is run inside a simulation of a specific company's environment. Only
-the matcher's output is shown to the hiring manager. Candidates never see
-which companies they're being matched against (blind matching), and an
-interview only happens if both parties opt in.
+A hiring **screening** tool — not a hiring-decision tool. A candidate completes
+a short intake (a BFI-10 personality inventory, situational-judgment items, and
+an optional verified profile built from their CV / LinkedIn / GitHub). The
+platform synthesizes a behavioral **persona**, then runs that persona through a
+multi-agent **simulation** of a specific role's team across a library of
+"moments of truth." A judging layer scores each simulated rollout against the
+role's criteria, and the manager sees a comparative **fit report**.
 
-This repository is the Week 1–3 design-partner-ready build. It is meant to
-survive a live demo where a stranger uploads their own company artifacts and
-sees candidates scored against them.
+Two product invariants shape the whole design:
 
-> **Architectural boundary (do not blur).** The matcher service is the only
-> piece that gets replaced when we move from this build to the production
-> stack. Same input shape, same output shape. Persona synthesis stays the
-> same until MiroFish lands (Week 8–16). Audit-trail wrapping is
-> ReasoningLayer's job (Week 16–24).
+- **Blind matching.** Candidate-facing API responses never reveal which role or
+  company a candidate is being evaluated for. This is enforced at the API layer.
+- **Mutual opt-in before contact.** A manager's triage/shortlist decisions never
+  notify the candidate. Only an actual interview schedule reaches out.
+
+> **Status: research prototype.** This is a demo-grade build meant to survive a
+> live walkthrough, not a hardened production service. Read the
+> [Security & auth](#security--auth) section before deploying it anywhere
+> reachable from the internet.
 
 ---
 
-## Two-command quickstart
+## Quickstart
 
 ```bash
-cp .env.example .env       # fill in OPENROUTER_API_KEY, change MANAGER_PASSWORD
-docker compose up --build  # backend on :8000, frontend on :5173
+cp .env.example .env    # then fill in the values below
+docker compose up --build
 ```
 
-That's it. Open <http://localhost:5173>.
+- Frontend: <http://localhost:5173>
+- Backend API + docs: <http://localhost:8000> · <http://localhost:8000/docs>
 
-The backend seeds two contrasting fictional Financial-Analyst companies on
-first boot:
+At minimum you need an `OPENROUTER_API_KEY` (for the LLM calls) and, unless you
+run in `DEV_MODE`, a Supabase project for auth. See
+[Configuration](#configuration).
 
-- **Meridian Capital Partners** — mid-market private credit. Patience, written
-  dissent, intellectual honesty. Ported verbatim from the v0 visual prototype.
-- **Kestrel Growth Partners** — late-stage growth equity. Speed of conviction,
-  pattern recognition, verbal agility. Authored as a deliberate counterweight
-  so the matcher visibly discriminates between environments for the same
-  candidate during a demo.
+The backend seeds two contrasting fictional Financial-Analyst positions on first
+boot so the simulation has something to compare against:
 
-You don't need to log in to take the candidate intake. To use the manager
-dashboard, sign in with `MANAGER_USERNAME` / `MANAGER_PASSWORD` from your
-`.env` (defaults are `manager` / `changeme` — change them).
+- **Meridian Capital Partners** — mid-market private credit. Rewards patience,
+  written dissent, intellectual honesty.
+- **Kestrel Growth Partners** — late-stage growth equity. Rewards speed of
+  conviction, pattern recognition, verbal agility.
+
+The same candidate should score differently against each — that contrast is the
+point.
 
 ---
 
-## How a demo runs
+## Architecture
 
-1. **Candidate side.** Visit <http://localhost:5173>. The browser doesn't have
-   a stored UUID yet, so you land on `/intake`.
-   - Read the intro. Take the BFI-10 (10 Likert items). Take the three SJTs.
-     Submit.
-   - The server synthesizes a persona, persists it under a UUID, returns it,
-     and the frontend stores the UUID in `localStorage`. From then on,
-     visiting the root takes you to `/profile`.
-2. **Manager side.** Visit <http://localhost:5173/manager>. Sign in.
-   - You'll see two seed companies and your candidate.
-   - Pick the candidate. Pick a company. Click **Run match**.
-   - The matcher (one OpenRouter call, strict JSON schema, response-healing
-     enabled) returns a fit report grounded in artifact text, broken down by
-     criterion, with cross-validation flags surfaced for interview probing.
-3. **Stress test the demo.** Pick the same candidate, run them against the
-   *other* seed company. The criteria are different and the LLM should produce
-   different scores — the contrast is the point.
-4. **Live template setup.** Go to **+ New** under Templates. Paste (or upload
-   PDF / DOCX of) a values doc, role spec, team-structure note, and a sample
-   IC memo or partner email. Run criteria extraction. Edit weights / labels.
-   Save. Run a match against the new company.
+```
+Candidate intake ─┐
+                  ├─▶ persona synthesis ─▶ simulation pipeline ─▶ fit report
+Verified profile ─┘        (Python)         (multi-agent + judges)     (manager)
+```
+
+**Backend** — FastAPI (Python 3.11+), SQLAlchemy, Alembic. Auth is Supabase
+JWT (verified via JWKS); role (`manager` vs `candidate`) is derived from an
+email allowlist. SQLite locally; Postgres (e.g. Supabase) in production — a
+`postgresql://` `DATABASE_URL` makes the app run Alembic migrations on startup.
+
+**Simulation pipeline** (`backend/app/services/simulation/`) — synthesizes a
+team, drafts scenarios, runs multi-agent rollouts, scores them with an ensemble
+of judges, and aggregates into a `FitProfile` per match. LLM access goes through
+OpenRouter (`services/openrouter.py`), so the model is swappable via
+`OPENROUTER_MODEL`.
+
+**Frontend** — Vite + React + React Router, Supabase JS for auth. Editorial
+design tokens live in `frontend/src/design.js`. In dev, Vite proxies API paths
+to the backend, so the browser talks to a single origin (no CORS).
+
+### Manager Shortlist (V7)
+
+The manager's primary surface is the **shortlist compare** page at
+`/manager/positions/:id/shortlist`. Opening a position lands here on an
+auto-ranked top-N comparison, with three tabs:
+
+- **Overview** — a dense, cell-clickable comparison table; every score drills to
+  its evidence.
+- **Scenarios** — per-scenario response cards, including a "you would have missed
+  this" flag when a below-threshold candidate out-responds the shortlist.
+- **Fit chart** — an SVG radar with role / team / overall sub-views.
+
+A floating decide bar (invite / decline) persists across tabs. An optional
+**Triage** page (`/triage`) lets a manager swipe candidates manually instead of
+trusting the auto-ranking. See `V7_IMPLEMENTATION_PLAN.md` for the full spec.
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill it in. `.env` is gitignored — never commit
+real values.
+
+| Var | Required | Notes |
+|-----|----------|-------|
+| `OPENROUTER_API_KEY` | yes | <https://openrouter.ai/keys> |
+| `OPENROUTER_MODEL` | no | Any OpenAI-compatible OpenRouter model. |
+| `DATABASE_URL` | no | SQLite by default; a `postgresql://` URL enables Alembic on boot. |
+| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | for auth | Required unless `DEV_MODE=true`. |
+| `MANAGER_EMAILS` | for auth | Comma-separated emails that get the manager role. |
+| `ADMIN_PASSWORD` | **prod** | Bearer token for `/admin/*`. **Change the default.** |
+| `DEV_MODE` | no | `true` **bypasses all auth** — local dev only. |
+| `CORS_ALLOW_ORIGINS` | no | Comma-separated origins. Don't use `*` with credentials. |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` / `VITE_MANAGER_EMAILS` | for auth | Browser-side mirrors of the above. |
+
+---
+
+## Security & auth
+
+This repo is safe to publish — no secrets, keys, or databases are tracked, and
+none appear in git history. But because the source is now public, a few
+deployment defaults matter:
+
+- **`DEV_MODE=true` disables authentication entirely** and treats every request
+  as a manager. It exists for local development and has a safe default
+  (`false`). **Never set it true on any deployed or public host.**
+- **`ADMIN_PASSWORD` guards the `/admin/*` routes** (validation, match logs,
+  training export). Its default (`changeme-admin`) is visible in this repo, so
+  you **must** override it with a strong secret in any real deployment.
+- **Auth model.** Backend routes verify a Supabase JWT via JWKS; the
+  `manager` role is granted only to emails in `MANAGER_EMAILS`. Blind matching
+  and mutual opt-in are enforced server-side, not merely hidden in the UI.
+- **CORS.** Set `CORS_ALLOW_ORIGINS` to your real frontend origin(s). The app
+  sends credentials, so a `*` origin is unsafe and unsupported.
+- **LLM data flow.** Candidate intake, personas, and simulation transcripts are
+  sent to OpenRouter (and thus the upstream model provider) to run matches. Use
+  fictional or consented data; don't feed real candidate PII into a demo.
+
+If you deploy this, also put it behind HTTPS and rotate the Supabase and
+OpenRouter keys you use for it.
 
 ---
 
@@ -73,142 +139,50 @@ dashboard, sign in with `MANAGER_USERNAME` / `MANAGER_PASSWORD` from your
 
 ```
 .
-├── backend/                FastAPI, Python 3.11+
+├── backend/                       FastAPI + SQLAlchemy + Alembic
 │   ├── app/
-│   │   ├── main.py         CORS + routers + lifespan-seed
-│   │   ├── config.py       env-driven Settings
-│   │   ├── db.py           SQLAlchemy session, init_db
-│   │   ├── models.py       Candidate, Company, Criterion, Match
-│   │   ├── schemas.py      Pydantic request/response shapes
-│   │   ├── auth.py         shared-password Basic auth dependency
-│   │   ├── seed_data.py    BFI10, SJTs, Meridian + Kestrel
-│   │   ├── routes/
-│   │   │   ├── candidates.py    public intake + UUID-keyed profile
-│   │   │   ├── companies.py     manager-gated CRUD
-│   │   │   ├── templates.py     parse-artifact + extract-criteria
-│   │   │   └── matches.py       trigger / list / get fit reports
+│   │   ├── main.py                app factory, routers, lifespan seed
+│   │   ├── config.py              env-driven Settings
+│   │   ├── auth.py                Supabase JWT (JWKS) dependencies
+│   │   ├── models.py              ORM models (Candidate, Position, Match, …)
+│   │   ├── schemas.py             Pydantic request/response shapes
+│   │   ├── routes/                candidates, positions, matches, triage, …
 │   │   └── services/
-│   │       ├── openrouter.py    httpx wrapper: response_format + healing
-│   │       ├── persona.py       Python port of synthesizePersona
-│   │       ├── criteria_extractor.py   real LLM call #1
-│   │       ├── matcher.py              real LLM call #2
-│   │       └── artifact_parser.py      pypdf + python-docx → text
-│   ├── tests/test_persona.py   pins port to JSX reference
-│   ├── pyproject.toml
-│   └── Dockerfile
-├── frontend/               Vite + React
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   ├── api.js          fetch wrapper, manager creds, candidate UUID
-│   │   ├── design.js       editorial tokens (FT-meets-research-lab)
-│   │   ├── components/
-│   │   │   ├── Widgets.jsx     MiniBar, ScoreBar, Pillar, GeneratingScreen
-│   │   │   └── FitReport.jsx   the editorial fit-report panel
-│   │   └── pages/
-│   │       ├── CandidateIntake.jsx     ported from hiring-sim-demo.jsx
-│   │       ├── CandidateProfile.jsx    persistent profile view
-│   │       ├── ManagerDashboard.jsx    candidate × company → match → report
-│   │       └── TemplateSetup.jsx       paste/upload → extract → review → save
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── index.html
-│   └── Dockerfile
-├── docker-compose.yml      backend + frontend + persistent SQLite volume
-├── .env.example            OpenRouter key, manager password, ports
-├── .gitignore
-└── README.md
+│   │       ├── comparison_builder.py   V7 shortlist report composer
+│   │       ├── composite_fit.py        team_fit + overall_fit axes
+│   │       ├── hero_quote.py           defining-turn picker
+│   │       └── simulation/             persona → team → scenarios → rollouts → judges
+│   ├── alembic/versions/          migrations 0001 … 0017
+│   └── tests/                     pytest suite
+├── frontend/                      Vite + React
+│   └── src/
+│       ├── pages/                 ManagerDashboard, ShortlistComparePage, intake, …
+│       ├── components/v7/         shortlist / triage / radar components
+│       ├── api.js                 fetch client
+│       └── design.js              design tokens
+├── docker-compose.yml
+├── .env.example
+└── V7_IMPLEMENTATION_PLAN.md
 ```
 
 ---
 
-## Configuration (.env)
+## Development
 
-| Var                      | Default                          | Notes                                              |
-|--------------------------|----------------------------------|----------------------------------------------------|
-| `OPENROUTER_API_KEY`     | _(required)_                     | <https://openrouter.ai/keys>                       |
-| `OPENROUTER_MODEL`       | `anthropic/claude-sonnet-4.6`    | Any OpenAI-compatible OpenRouter model. Swappable. |
-| `MANAGER_USERNAME`       | `manager`                        |                                                    |
-| `MANAGER_PASSWORD`       | `changeme`                       | **Change this.**                                   |
-| `BACKEND_PORT`           | `8000`                           |                                                    |
-| `FRONTEND_PORT`          | `5173`                           |                                                    |
-| `VITE_API_BASE_URL`      | `http://localhost:8000`          | Baked into frontend at build time.                 |
-| `CORS_ALLOW_ORIGINS`     | `http://localhost:5173,…`        | Comma-separated.                                   |
-| `DATABASE_URL`           | `sqlite:////data/hiring_sim.db`  | Path inside the container; the volume mounts here. |
-
----
-
-## How matching works
-
-Every match is two layers:
-
-1. **Persona synthesis** runs locally in Python (`services/persona.py`). BFI-10
-   responses are reverse-scored and averaged per trait; SJT responses are
-   aggregated across the three scenarios; three cross-validation rules (
-   `agreeable-dissenter`, `low-c-high-rigor`, `neurotic-but-tolerant`) flag
-   tensions between self-report and situational response. The Python port is
-   regression-tested against the JSX reference (`backend/tests/test_persona.py`).
-2. **Matcher** sends the persona + company artifacts + criteria to OpenRouter
-   in a single chat completion with:
-   - `response_format: {type: "json_schema", strict: true}` — schema enforced
-     server-side; criterion keys come from the company row, not the model.
-   - `plugins: [{id: "response-healing"}]` — repairs malformed JSON.
-   The model produces a 0–100 score per criterion plus a one-sentence
-   justification that quotes artifact text. We compute the weighted overall
-   ourselves so the arithmetic is deterministic. The band thresholds (Strong /
-   Plausible / Edge / Low) match the JSX reference.
-
-The matcher prompt explicitly forbids referring to protected characteristics
-and requires every justification to cite artifact text. Bias auditing is the
-Week 4+ workstream.
-
----
-
-## Scope boundaries (intentionally out for v0)
-
-- No MiroFish (Week 8–16)
-- No ReasoningLayer (Week 16–24)
-- No HrFlow / resume parsing (would dilute the matching story; revisit at v1)
-- No cognitive ability testing (adverse-impact risk; deferred)
-- No Slack / email ingestion (GDPR / CCPA exposure; Year 2+)
-- No real auth — shared-password only. Magic-link or SSO is post-design-partner.
-- No Postgres. SQLite is fine at this scale and the SQLAlchemy models port
-  directly to Postgres later.
-- No hosted deployment. `docker compose up` locally is the entire surface.
-
----
-
-## Notes on the ported source
-
-`hiring-sim-demo.jsx` was the visual prototype that established the editorial
-aesthetic, BFI-10 scoring logic, SJT content, and the v0 deterministic matching
-sketch. Everything from that file has been ported and verified:
-
-- `BFI10`, `SJTS`, and the Meridian seed entry → `backend/app/seed_data.py`.
-- `synthesizePersona` and `generateNarrative` → `backend/app/services/persona.py`,
-  pinned with regression tests against hand-computed reference values.
-- `MATCHING_PROMPT` and the band thresholds → `backend/app/services/matcher.py`.
-- The `IntroScreen` / `BfiScreen` / `SjtScreen` / `GeneratingScreen` /
-  `ReportScreen` / `MiniBar` / `Pillar` UI primitives → `frontend/src/pages/CandidateIntake.jsx`,
-  `frontend/src/components/Widgets.jsx`, `frontend/src/components/FitReport.jsx`.
-- The COLORS / FONT_DISPLAY / FONT_BODY / FONT_MONO design tokens →
-  `frontend/src/design.js`.
-
-The original file can be deleted once you've sanity-checked the port:
+Run the backend test suite:
 
 ```bash
-rm hiring-sim-demo.jsx
+cd backend
+python -m pytest -q
 ```
+
+Migrations run automatically on startup against Postgres. The frontend has no
+separate test runner; verify UI changes against the running dev server.
 
 ---
 
-## Validation checklist
+## License
 
-- [x] Persona Python port passes regression tests against JSX reference.
-- [x] Backend boots and serves `/health`, `/candidates/instruments`,
-      `/candidates`, `/companies`, `/matches`.
-- [x] SQLite volume persists across `docker compose down && up` cycles.
-- [x] CandidateIntake → POST `/candidates` round-trips a UUID and a
-      narrative-summary persona.
-- [x] Manager dashboard lists Meridian + Kestrel and the new candidate.
-- [ ] _Live LLM call when OPENROUTER_API_KEY is real — exercise during demo prep._
+No license is set yet. Until a `LICENSE` file is added, this code is
+**"all rights reserved"** by default — add one (e.g. MIT or Apache-2.0) if you
+intend to let others use or contribute.

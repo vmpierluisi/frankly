@@ -36,11 +36,9 @@ class Settings(BaseSettings):
     # --- Auth ---
     # Comma-separated list of Google emails that get the manager role.
     manager_emails: str = ""
-    # Legacy basic-auth (kept for local fallback; ignored when DEV_MODE=false
-    # and Supabase is configured).
-    manager_username: str = "manager"
-    manager_password: str = "changeme"
-    # Admin API token — checked against Authorization: Bearer <token> on /admin/* routes.
+    # Admin API token — checked against Authorization: Bearer <token> on /admin/*
+    # routes. MUST be overridden in any non-local deployment: this default is
+    # public in the repo, so leaving it unset leaves /admin/* open.
     admin_password: str = "changeme-admin"
     # Skip JWT verification in local dev (never set true in compose/prod).
     dev_mode: bool = False
