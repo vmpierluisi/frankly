@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, JSON, event
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, JSON, UniqueConstraint, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -643,3 +643,36 @@ class ValidationRun(Base):
     error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+# ----------------------------------------------------------------------------
+# Manager Shortlist V7 — triage decisions
+#
+# One row per (manager, position, candidate) trio recording the manager's
+# manual swipe decision. Only written when the manager exercises the optional
+# Triage flow; the default auto-shortlist never touches this table. Blind
+# matching is preserved — a decision here never triggers a candidate-facing
+# notification (only /interviews/schedule does).
+# ----------------------------------------------------------------------------
+class TriageDecision(Base):
+    __tablename__ = "triage_decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    # Supabase auth identity of the manager (matches CurrentUser.auth_user_id).
+    # No FK — there is no local users table; identity lives in Supabase.
+    manager_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    position_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("positions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    candidate_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # "pass" | "shortlist". "undecided" is represented by the absence of a row.
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "manager_id", "position_id", "candidate_id", name="uq_triage_one_per_trio"
+        ),
+    )

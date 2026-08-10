@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # --- Manager Shortlist V7 ---
+    # Gates the new shortlist + triage routes and the manager-side V7 surface.
+    # Flip on for staging once the flow is validated (see V7 plan §2).
+    enable_v7: bool = True
+
     # --- Simulation pipeline ---
     # Fast mode: K=1, 2 scenarios, 1 judge — ~30s/match for live demos.
     sim_fast_mode: bool = False

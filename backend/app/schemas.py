@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -675,3 +675,152 @@ class CalibrationTimelineOut(BaseModel):
 # ----------------------------------------------------------------------------
 class HealthOut(BaseModel):
     ok: bool = True
+
+
+# ----------------------------------------------------------------------------
+# Manager Shortlist V7 — comparison + triage contracts (see V7 plan §4).
+#
+# The single /positions/{id}/shortlist endpoint returns ShortlistComparisonReport.
+# All fields are derived at request time from existing Match / Rollout /
+# RolloutScore data — nothing new is persisted except TriageDecision.
+# ----------------------------------------------------------------------------
+class CriterionMeta(BaseModel):
+    id: str
+    label: str
+    why: str = ""
+    weight: float = 0.0
+    scenario_id: str | None = None
+
+
+class SkillMeta(BaseModel):
+    id: str
+    label: str
+    reason: str = ""
+    scenario_id: str | None = None
+
+
+class TeammateMeta(BaseModel):
+    id: str
+    name: str
+    short: str          # axis-label form, e.g. "Maya, MD"
+    role: str = ""
+    voice: str = ""     # one-line sample
+
+
+class OverallAxisMeta(BaseModel):
+    id: str
+    label: str
+    tip: str = ""
+
+
+class ScenarioMeta(BaseModel):
+    id: str
+    eyebrow: str = ""
+    title: str
+    prompt: str = ""
+    who: str = ""       # "Maya Kestrel, Managing Director"
+
+
+class PositionContext(BaseModel):
+    id: str
+    title: str
+    company_name: str
+    role_short: str = ""
+    criteria: list[CriterionMeta] = Field(default_factory=list)
+    skills: list[SkillMeta] = Field(default_factory=list)
+    team: list[TeammateMeta] = Field(default_factory=list)
+    overall_axes: list[OverallAxisMeta] = Field(default_factory=list)
+    default_top_n: int = 3
+    available_sizes: list[int] = Field(default_factory=lambda: [3, 5, 10])
+
+
+class OverviewCell(BaseModel):
+    v: str = ""              # short verdict, e.g. "Refuses the asterisk"
+    d: str | None = None     # one-line italic detail
+    top: bool = False
+    weak: bool = False
+
+
+class SkillCell(BaseModel):
+    lev: str = "Absent"      # Expert | Strong | Working | Limited | Absent
+    evid: str | None = None
+    src: str | None = None   # "CV · Brookfield"
+    top: bool = False
+    weak: bool = False
+
+
+class HeroQuote(BaseModel):
+    text: str = ""
+    scenario_id: str = ""
+    to_teammate_id: str | None = None
+    dimensions: list[str] = Field(default_factory=list)
+
+
+class SignalTile(BaseModel):
+    lab: str
+    v: str
+    e: str = ""
+    tell: bool = False
+
+
+class ScenarioResponse(BaseModel):
+    score: int = 0
+    text: str = ""
+    skills_shown: list[str] = Field(default_factory=list)
+    evidence_turns: list[int] = Field(default_factory=list)
+
+
+class CandidateInReport(BaseModel):
+    id: str
+    name: str
+    anchor: str = ""
+    anchor_short: str = ""
+    palette_color_var: str = "--c-slot1"
+    score: int = 0
+    band: str = ""
+    delta: str = ""
+    linkedin_url: str | None = None
+    cv_available: bool = False
+    hero_quote: HeroQuote = Field(default_factory=HeroQuote)
+    signals: list[SignalTile] = Field(default_factory=list)
+    overview: dict[str, OverviewCell] = Field(default_factory=dict)
+    tell: str = ""
+    skills: dict[str, SkillCell] = Field(default_factory=dict)
+    role_fit: dict[str, int] = Field(default_factory=dict)
+    team_fit: dict[str, int] = Field(default_factory=dict)
+    overall_fit: dict[str, int] = Field(default_factory=dict)
+    responses: dict[str, ScenarioResponse] = Field(default_factory=dict)
+    triage_decision: Literal["pass", "shortlist", "undecided"] = "undecided"
+
+
+class ShortlistComparisonReport(BaseModel):
+    position: PositionContext
+    scenarios: list[ScenarioMeta] = Field(default_factory=list)
+    candidates: list[CandidateInReport] = Field(default_factory=list)
+    available_candidates: list[CandidateInReport] = Field(default_factory=list)
+    selection_mode: Literal["auto_top_n", "explicit"] = "auto_top_n"
+    top_n_applied: int | None = None
+
+
+# --- Triage queue ---------------------------------------------------------
+class TriageCandidate(BaseModel):
+    id: str
+    name: str
+    anchor: str = ""
+    anchor_short: str = ""
+    score: int = 0
+    band: str = ""
+    delta: str = ""
+    hero_quote: HeroQuote = Field(default_factory=HeroQuote)
+    signals: list[SignalTile] = Field(default_factory=list)
+
+
+class TriageQueue(BaseModel):
+    position: PositionContext
+    candidates: list[TriageCandidate] = Field(default_factory=list)
+    decided: dict[str, str] = Field(default_factory=dict)
+
+
+class TriageDecisionPayload(BaseModel):
+    candidate_id: str
+    decision: Literal["pass", "shortlist", "undecided"]
