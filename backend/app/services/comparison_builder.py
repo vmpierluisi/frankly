@@ -290,26 +290,26 @@ def _build_candidate(
 
 
 def _build_signals(position: models.Position, dim_means: dict[str, int]) -> list[dict[str, Any]]:
+    """Up to four signal tiles: the strongest criteria first, with the single
+    weakest flagged as a "tell". Each criterion appears at most once — with few
+    criteria we simply show fewer tiles rather than duplicating one."""
     label_by_key = {c.key: c.label for c in position.criteria}
     if not dim_means:
         return []
     ranked = sorted(dim_means.items(), key=lambda kv: kv[1], reverse=True)
+    weak_key = ranked[-1][0]
+    # Show the top criteria (cap 4), flagging the weakest as the tell.
     tiles: list[dict[str, Any]] = []
-    for key, val in ranked[:3]:
+    for key, val in ranked[:4]:
         tiles.append(
-            {"lab": label_by_key.get(key, key), "v": _verdict_label(val), "e": f"{val}/100", "tell": False}
+            {
+                "lab": label_by_key.get(key, key),
+                "v": _verdict_label(val),
+                "e": f"{val}/100",
+                "tell": key == weak_key and len(ranked) > 1,
+            }
         )
-    # Last tile: the weakest criterion, flagged as a tell.
-    weak_key, weak_val = ranked[-1]
-    tiles.append(
-        {
-            "lab": label_by_key.get(weak_key, weak_key),
-            "v": _verdict_label(weak_val),
-            "e": f"{weak_val}/100",
-            "tell": True,
-        }
-    )
-    return tiles[:4]
+    return tiles
 
 
 def _build_tell(position: models.Position, dim_means: dict[str, int]) -> str:
