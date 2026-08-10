@@ -119,34 +119,46 @@ export default function TriageStack({ candidates, decided = {}, onDecide, onOpen
         </div>
       </div>
 
-      {/* Card stack */}
-      <div style={{ position: "relative", height: 420 }}>
-        {remaining.slice(0, 3).reverse().map((c, ri, arr) => {
-          const depth = arr.length - 1 - ri; // 0 = top
-          const isTop = depth === 0;
+      {/* Card stack. The top card sits in normal flow so it defines the
+          container height (no fixed height → no content overflow / overlap);
+          the peeking back cards are absolutely positioned behind it. */}
+      <div style={{ position: "relative" }}>
+        {remaining.slice(1, 3).map((c, i) => {
+          const depth = i + 1; // 1 = first card behind
           return (
             <div
               key={c.id}
-              ref={isTop ? cardRef : null}
-              onMouseDown={isTop ? onMouseDown : undefined}
+              aria-hidden
               style={{
                 position: "absolute",
                 inset: 0,
-                transform: isTop
-                  ? `translateX(${drag}px) rotate(${rotate}deg)`
-                  : `translateY(${depth * 10}px) scale(${1 - depth * 0.04})`,
-                transition: dragState.current.active && isTop ? "none" : "transform 0.22s ease, opacity 0.22s ease",
-                opacity: committing && isTop ? 0 : 1,
-                zIndex: 10 - depth,
-                cursor: isTop ? "grab" : "default",
-                background: tint,
-                userSelect: "none",
+                transform: `translateY(${depth * 10}px) scale(${1 - depth * 0.04})`,
+                transition: "transform 0.22s ease",
+                zIndex: 1,
+                pointerEvents: "none",
               }}
             >
               <TriageCard candidate={c} />
             </div>
           );
         })}
+
+        <div
+          ref={cardRef}
+          onMouseDown={onMouseDown}
+          style={{
+            position: "relative",
+            zIndex: 5,
+            transform: `translateX(${drag}px) rotate(${rotate}deg)`,
+            transition: dragState.current.active ? "none" : "transform 0.22s ease, opacity 0.22s ease",
+            opacity: committing ? 0 : 1,
+            cursor: "grab",
+            background: tint,
+            userSelect: "none",
+          }}
+        >
+          <TriageCard candidate={current} />
+        </div>
       </div>
 
       {/* Explicit buttons */}

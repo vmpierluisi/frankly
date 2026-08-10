@@ -5,19 +5,25 @@ import { COLORS, FONT_MONO } from "../../design.js";
 // Props:
 //   axes:    [{ id, label }]                 — one spoke per axis
 //   series:  [{ id, name, color, values }]   — values keyed by axis id (0..100)
-//   size:    px (square). focusedId dims the other series.
+//   size:    px (square plot area). focusedId dims the other series.
 //   onAxisHover(axis | null), onSeriesHover(seriesId | null)
+//
+// The viewBox is padded well beyond the plot square so axis labels anchored to
+// the left/right (start/end) have room and never clip at the edge.
+const PAD_X = 104; // horizontal room for side labels
+const PAD_Y = 52; // vertical room for top/bottom labels
+
 export default function RadarSVG({
   axes,
   series,
-  size = 460,
+  size = 480,
   focusedId = null,
   onAxisHover,
   onSeriesHover,
 }) {
   const cx = size / 2;
   const cy = size / 2;
-  const radius = size / 2 - 64; // leave room for labels
+  const radius = size / 2 - 8; // labels live in the padding, so use nearly all of it
   const n = axes.length;
 
   if (n < 3) {
@@ -33,12 +39,14 @@ export default function RadarSVG({
   const point = (i, r) => [cx + Math.cos(angle(i)) * r, cy + Math.sin(angle(i)) * r];
 
   const rings = [0.25, 0.5, 0.75, 1];
+  const vbW = size + PAD_X * 2;
+  const vbH = size + PAD_Y * 2;
 
   return (
     <svg
-      viewBox={`0 0 ${size} ${size}`}
+      viewBox={`${-PAD_X} ${-PAD_Y} ${vbW} ${vbH}`}
       width="100%"
-      style={{ maxWidth: size, display: "block" }}
+      style={{ maxWidth: vbW, display: "block", margin: "0 auto" }}
       role="img"
       aria-label="Fit radar chart"
     >
@@ -56,24 +64,32 @@ export default function RadarSVG({
       {/* Spokes + axis labels */}
       {axes.map((ax, i) => {
         const [x, y] = point(i, radius);
-        const [lx, ly] = point(i, radius + 22);
-        const anchor = Math.abs(lx - cx) < 8 ? "middle" : lx > cx ? "start" : "end";
+        const [lx, ly] = point(i, radius + 20);
+        const nearCenterX = Math.abs(lx - cx) < 8;
+        const anchor = nearCenterX ? "middle" : lx > cx ? "start" : "end";
+        const lines = wrapLabel(ax.label, 16);
+        // Nudge multi-line labels up so they stay vertically centered on the spoke.
+        const y0 = ly - ((lines.length - 1) * 11) / 2;
         return (
           <g key={ax.id}>
             <line x1={cx} y1={cy} x2={x} y2={y} stroke={COLORS.rule} strokeWidth={1} />
             <text
               x={lx}
-              y={ly}
+              y={y0}
               textAnchor={anchor}
               dominantBaseline="middle"
               fontFamily={FONT_MONO}
-              fontSize={10}
+              fontSize={11}
               fill={COLORS.muted}
               style={{ cursor: onAxisHover ? "pointer" : "default" }}
               onMouseEnter={() => onAxisHover?.(ax)}
               onMouseLeave={() => onAxisHover?.(null)}
             >
-              {truncate(ax.label, 16)}
+              {lines.map((ln, li) => (
+                <tspan key={li} x={lx} dy={li === 0 ? 0 : 12}>
+                  {ln}
+                </tspan>
+              ))}
             </text>
           </g>
         );
@@ -111,6 +127,25 @@ function clamp(v) {
   return Math.max(0, Math.min(100, n));
 }
 
-function truncate(s, max) {
-  return s && s.length > max ? s.slice(0, max - 1) + "…" : s;
+// Wrap a label into at most two lines near `max` chars, breaking on a space.
+// Falls back to a hard split when a single word is too long.
+function wrapLabel(s, max) {
+  const label = s || "";
+  if (label.length <= max) return [label];
+  const words = label.split(" ");
+  if (words.length > 1) {
+    const lines = ["", ""];
+    let idx = 0;
+    for (const w of words) {
+      const candidate = lines[idx] ? `${lines[idx]} ${w}` : w;
+      if (candidate.length > max && idx === 0) {
+        idx = 1;
+        lines[1] = w;
+      } else {
+        lines[idx] = candidate;
+      }
+    }
+    return lines.filter(Boolean);
+  }
+  return [label.slice(0, max), label.slice(max)];
 }

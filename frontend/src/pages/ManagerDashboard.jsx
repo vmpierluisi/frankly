@@ -21,9 +21,9 @@ const TABS = [
 //
 // Flow:
 //   1. Manager selects a position from the grid.
-//   2. Leaderboard renders immediately, showing V2 fit reports ranked by score.
+//   2. Leaderboard renders immediately, ranked by simulation fit score.
 //   3. Rows grow over time as candidates complete intake and simulations finish.
-//   4. Click any row to expand FitProfileV3 inline.
+//   4. Click any row to open that candidate in the V7 shortlist comparison.
 
 export default function ManagerDashboard() {
   const nav = useNavigate();

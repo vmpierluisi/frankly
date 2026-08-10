@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { positions, matches } from "../api.js";
-import FitProfileV3 from "./FitProfileV3.jsx";
 import { GeneratingScreen } from "./Widgets.jsx";
 
 const POLL_INTERVAL_MS = 5000;
@@ -25,7 +24,6 @@ export default function PositionLeaderboard({ positionId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [expandedMatchId, setExpandedMatchId] = useState(null);
   const [retrying, setRetrying] = useState(null);
   const pollRef = useRef(null);
 
@@ -52,7 +50,6 @@ export default function PositionLeaderboard({ positionId }) {
   useEffect(() => {
     setLoading(true);
     setData(null);
-    setExpandedMatchId(null);
     load();
     return () => clearTimeout(pollRef.current);
   }, [positionId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,8 +80,6 @@ export default function PositionLeaderboard({ positionId }) {
     (r) => r.status === "pending" || r.status === "running",
   );
   const failed = data.results.filter((r) => r.status === "failed");
-
-  const criteriaIndex = {}; // FitProfileV3 looks up labels lazily — empty index is fine here
 
   return (
     <div>
@@ -158,13 +153,6 @@ export default function PositionLeaderboard({ positionId }) {
                 rank={idx + 1}
                 prominent
                 positionId={positionId}
-                expanded={expandedMatchId === row.match_id}
-                criteriaIndex={criteriaIndex}
-                onToggle={() =>
-                  setExpandedMatchId(
-                    expandedMatchId === row.match_id ? null : row.match_id,
-                  )
-                }
               />
             ))}
           </div>
@@ -183,13 +171,6 @@ export default function PositionLeaderboard({ positionId }) {
                 rank={topFive.length + idx + 1}
                 prominent={false}
                 positionId={positionId}
-                expanded={expandedMatchId === row.match_id}
-                criteriaIndex={criteriaIndex}
-                onToggle={() =>
-                  setExpandedMatchId(
-                    expandedMatchId === row.match_id ? null : row.match_id,
-                  )
-                }
               />
             ))}
           </div>
@@ -232,21 +213,23 @@ export default function PositionLeaderboard({ positionId }) {
 
 // ─── Succeeded row ──────────────────────────────────────────────────────────
 
-function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggle, positionId }) {
+function LeaderboardRow({ row, rank, prominent, positionId }) {
   const nav = useNavigate();
   const scoreColor = bandColor(row.band);
+  const openShortlist = () =>
+    nav(`/manager/positions/${positionId}/shortlist?candidate_ids=${row.candidate_id}`);
 
   return (
     <div>
       <div
-        onClick={onToggle}
+        onClick={openShortlist}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 16,
           padding: prominent ? "16px 20px" : "10px 20px",
-          border: `1px solid ${expanded ? COLORS.ink : COLORS.rule}`,
-          background: expanded ? "#fafafa" : "transparent",
+          border: `1px solid ${COLORS.rule}`,
+          background: "transparent",
           cursor: "pointer",
           transition: "border 0.15s, background 0.15s",
         }}
@@ -355,57 +338,9 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
           {row.overall_score}
         </div>
 
-        {/* Chevron */}
-        <div style={{ color: COLORS.muted, fontSize: 11 }}>{expanded ? "▲" : "▼"}</div>
+        {/* Open-shortlist affordance */}
+        <div style={{ color: COLORS.muted, fontSize: 13 }} title="Compare in shortlist">→</div>
       </div>
-
-      {/* Expanded V2 report */}
-      {expanded && row.report && Object.keys(row.report).length > 0 && (
-        <div
-          style={{
-            border: `1px solid ${COLORS.ink}`,
-            borderTop: "none",
-            padding: "32px 28px",
-            background: "#fafafa",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <span className="label-mono" style={{ fontSize: 10 }}>Legacy single-candidate report</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                nav(`/manager/positions/${positionId}/shortlist?candidate_ids=${row.candidate_id}`);
-              }}
-              style={{
-                background: COLORS.ink,
-                color: COLORS.paper,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: FONT_MONO,
-                fontSize: 10,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                padding: "8px 14px",
-              }}
-            >
-              Compare in shortlist →
-            </button>
-          </div>
-          <FitProfileV3
-            report={{ ...row.report, matchId: row.match_id }}
-            candidate={{
-              id: row.candidate_id,
-              display_name: row.display_name,
-              cv_path: row.cv_path,
-              linkedin_url: row.linkedin_url,
-              github_url: row.github_url,
-              portfolio_url: row.portfolio_url,
-              profile_accuracy_score: row.profile_accuracy_score || 0,
-            }}
-            criteriaIndex={criteriaIndex}
-          />
-        </div>
-      )}
     </div>
   );
 }

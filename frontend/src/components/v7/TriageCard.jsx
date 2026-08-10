@@ -44,10 +44,14 @@ export default function TriageCard({ candidate }) {
             margin: 0,
             fontFamily: FONT_DISPLAY,
             fontStyle: "italic",
-            fontSize: 22,
+            fontSize: 21,
             lineHeight: 1.4,
             borderLeft: `3px solid ${COLORS.accent}`,
             paddingLeft: 18,
+            display: "-webkit-box",
+            WebkitLineClamp: 6,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           “{hero.text}”

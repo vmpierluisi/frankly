@@ -98,8 +98,8 @@ export default function FitChart({ report, view = "role", onChangeView }) {
       </h3>
       <p style={{ color: COLORS.muted, fontStyle: "italic", margin: "0 0 20px" }}>{active.lede}</p>
 
-      <div style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: "1 1 460px", minWidth: 320, transition: "opacity 0.22s" }}>
+      <div style={{ display: "flex", gap: 32, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+        <div style={{ position: "relative", flex: "1 1 560px", minWidth: 320, maxWidth: 720, transition: "opacity 0.22s" }}>
           <RadarSVG
             axes={axes}
             series={series}
