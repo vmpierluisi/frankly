@@ -28,7 +28,13 @@ def _empty_quote() -> dict[str, Any]:
     return {"text": "", "scenario_id": "", "to_teammate_id": None, "dimensions": []}
 
 
-def pick_hero_quote(match: "Match", db: Session) -> dict[str, Any]:
+def pick_hero_quote(
+    match: "Match",
+    db: Session | None = None,
+    *,
+    rollouts: "list[models.Rollout] | None" = None,
+    scores: "list[models.RolloutScore] | None" = None,
+) -> dict[str, Any]:
     """Pick the candidate's most signature simulated utterance.
 
     Algorithm:
@@ -40,24 +46,28 @@ def pick_hero_quote(match: "Match", db: Session) -> dict[str, Any]:
       3. Return the candidate's utterance + scenario + the teammate they were
          responding to + the dimensions that turn fed.
 
-    Degrades to an empty quote when the match has no usable scored evidence.
+    ``rollouts`` / ``scores`` may be prefetched by the caller to avoid queries;
+    when omitted they are loaded via ``db``. Degrades to an empty quote when the
+    match has no usable scored evidence.
     """
-    rollouts = list(
-        db.execute(
-            select(models.Rollout).where(models.Rollout.match_id == match.id)
-        ).scalars()
-    )
+    if rollouts is None:
+        rollouts = list(
+            db.execute(
+                select(models.Rollout).where(models.Rollout.match_id == match.id)
+            ).scalars()
+        )
     if not rollouts:
         return _empty_quote()
     rollout_by_id = {r.id: r for r in rollouts}
 
-    scores = list(
-        db.execute(
-            select(models.RolloutScore).where(
-                models.RolloutScore.rollout_id.in_([r.id for r in rollouts])
-            )
-        ).scalars()
-    )
+    if scores is None:
+        scores = list(
+            db.execute(
+                select(models.RolloutScore).where(
+                    models.RolloutScore.rollout_id.in_([r.id for r in rollouts])
+                )
+            ).scalars()
+        )
     scores = [
         s
         for s in scores

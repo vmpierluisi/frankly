@@ -76,7 +76,13 @@ def _teammates_for_match(match: "Match") -> list[models.SyntheticTeammate]:
     return list(getattr(team, "teammates", []) or [])
 
 
-def compute_team_fit(match: "Match", db: Session) -> dict[str, int]:
+def compute_team_fit(
+    match: "Match",
+    db: Session | None = None,
+    *,
+    rollouts: "list[models.Rollout] | None" = None,
+    scores_by_rollout: "dict[str, list[models.RolloutScore]] | None" = None,
+) -> dict[str, int]:
     """0..100 per synthetic teammate — how productively the candidate worked
     with that teammate across the simulation.
 
@@ -85,13 +91,19 @@ def compute_team_fit(match: "Match", db: Session) -> dict[str, int]:
     teammate.id``). Falls back to the position-wide mean rollout-quality when no
     rollout featured a given teammate. A more honest measure is per-turn
     pair-interaction quality, which needs a new judge prompt (plan §12 #2).
+
+    ``rollouts`` / ``scores_by_rollout`` may be prefetched by the caller to
+    avoid per-candidate queries (the report builder loads them once for the
+    whole request); when omitted they are queried via ``db``.
     """
     teammates = _teammates_for_match(match)
     if not teammates:
         return {}
 
-    rollouts = _rollouts_for_match(match, db)
-    scores_by_rollout = _scores_by_rollout([r.id for r in rollouts], db)
+    if rollouts is None:
+        rollouts = _rollouts_for_match(match, db)
+    if scores_by_rollout is None:
+        scores_by_rollout = _scores_by_rollout([r.id for r in rollouts], db)
 
     quality_by_rollout: dict[str, float] = {}
     for r in rollouts:
@@ -149,12 +161,23 @@ def _tenure_avg_years(match: "Match") -> float | None:
     return mean(spans) if spans else None
 
 
-def compute_overall_fit(match: "Match", db: Session) -> dict[str, int]:
+def compute_overall_fit(
+    match: "Match",
+    db: Session | None = None,
+    *,
+    rollouts: "list[models.Rollout] | None" = None,
+    scores_by_rollout: "dict[str, list[models.RolloutScore]] | None" = None,
+    team_fit: dict[str, int] | None = None,
+) -> dict[str, int]:
     """Six composite axes, all derived, no new persistence.
 
     Axes: role_fit, team_chem, memo_culture, conflict_prod, ramp_speed,
     long_cycle. Each degrades to the match overall score when its finer signal
     is unavailable so the radar is always renderable.
+
+    ``rollouts`` / ``scores_by_rollout`` may be prefetched to avoid queries;
+    ``team_fit`` may be passed when the caller already computed it (the report
+    builder does), avoiding a second team-fit pass.
     """
     report = match.report or {}
     overall = float(match.overall_score or report.get("overallScore") or 0)
@@ -163,8 +186,12 @@ def compute_overall_fit(match: "Match", db: Session) -> dict[str, int]:
     # role_fit — already exists.
     role_fit = overall
 
-    # team_chem — mean of per-teammate fit.
-    team_values = list(compute_team_fit(match, db).values())
+    # team_chem — mean of per-teammate fit (reuse the caller's if given).
+    if team_fit is None:
+        team_fit = compute_team_fit(
+            match, db, rollouts=rollouts, scores_by_rollout=scores_by_rollout
+        )
+    team_values = list(team_fit.values())
     team_chem = mean(team_values) if team_values else behaviour
 
     # memo_culture — v0: written-dissent + ic-memo-writing signal, else behaviour.
@@ -177,7 +204,7 @@ def compute_overall_fit(match: "Match", db: Session) -> dict[str, int]:
     # conflict_prod — v0: productive-disagreement intent ratio from rollout
     # transcripts; falls back to low-ego-collab + written-dissent means, then
     # to behaviour. Intent labels are optional, so the ratio path often no-ops.
-    conflict_prod = _conflict_productivity(match, db)
+    conflict_prod = _conflict_productivity(match, db, rollouts=rollouts)
     if conflict_prod is None:
         conflict_prod = _dim_mean(
             report, "low_ego_collaboration", "lowEgoCollaboration", "written_dissent"
@@ -220,13 +247,19 @@ _DISAGREEMENT_INTENTS = _PRODUCTIVE_INTENTS | {
 }
 
 
-def _conflict_productivity(match: "Match", db: Session) -> float | None:
+def _conflict_productivity(
+    match: "Match",
+    db: Session | None = None,
+    *,
+    rollouts: "list[models.Rollout] | None" = None,
+) -> float | None:
     """(productive disagreement turns / total disagreement turns) * 100.
 
     Reads the candidate's own turns' ``intent`` labels across all rollouts.
     Returns None when no disagreement intents are present (labels are optional).
     """
-    rollouts = _rollouts_for_match(match, db)
+    if rollouts is None:
+        rollouts = _rollouts_for_match(match, db)
     productive = 0
     total = 0
     for r in rollouts:

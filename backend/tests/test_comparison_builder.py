@@ -125,3 +125,43 @@ def test_unknown_position_raises(world_db):
     _, db = world_db
     with pytest.raises(LookupError):
         build_shortlist_report("does-not-exist", session=db)
+
+
+def _count_queries(db, fn):
+    """Count SQL statements emitted while calling fn()."""
+    from sqlalchemy import event
+
+    count = {"n": 0}
+
+    def before(conn, cursor, statement, params, context, executemany):
+        count["n"] += 1
+
+    engine = db.get_bind()
+    event.listen(engine, "before_cursor_execute", before)
+    try:
+        fn()
+    finally:
+        event.remove(engine, "before_cursor_execute", before)
+    return count["n"]
+
+
+def test_query_count_is_flat_regardless_of_candidate_count():
+    """The prefetch collapses the old N+1 storm: building a 3-candidate report
+    and a 5-candidate report must issue the same (small, constant) number of
+    queries — proof there is no per-candidate rollout/score fan-out."""
+    db = make_session()
+    build_world(
+        db,
+        candidate_specs=[{"name": f"C{i}", "overall": 90 - i} for i in range(8)],
+    )
+
+    q3 = _count_queries(db, lambda: build_shortlist_report("meridian-fa", top_n=3, session=db))
+    q5 = _count_queries(db, lambda: build_shortlist_report("meridian-fa", top_n=5, session=db))
+
+    # Same query count for 3 vs 5 active (available set covers the rest either
+    # way) — the prefetch means candidate count doesn't drive query count.
+    assert q3 == q5
+    # A small constant (position + relationship loads + 2 prefetch queries).
+    # Well under the old per-candidate N+1 (which was ~8 queries × N candidates).
+    assert q3 <= 12
+    db.close()

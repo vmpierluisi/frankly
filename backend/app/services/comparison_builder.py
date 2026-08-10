@@ -14,15 +14,68 @@ read here to stamp each candidate's manual decision (default "undecided").
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass, field
 from statistics import mean
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .. import models
 from .composite_fit import compute_overall_fit, compute_team_fit
 from .hero_quote import pick_hero_quote
+
+
+@dataclass
+class _Prefetch:
+    """Rollouts + scores for a set of matches, loaded in two queries up front.
+
+    The report builds a full CandidateInReport for every candidate in the
+    active set *and* the ~20 available candidates. Each candidate's team_fit,
+    overall_fit, hero_quote, and responses all read the same rollouts/scores, so
+    loading them once here (rather than per-candidate, per-function) collapses
+    what was an N+1 storm — ~8 queries × ~23 candidates against a remote
+    Postgres — down to two queries total for the whole request.
+    """
+
+    rollouts_by_match: dict[str, list[models.Rollout]] = field(default_factory=dict)
+    scores_by_rollout: dict[str, list[models.RolloutScore]] = field(default_factory=dict)
+
+    def rollouts(self, match_id: str) -> list[models.Rollout]:
+        return self.rollouts_by_match.get(match_id, [])
+
+    def scores_for(self, match_id: str) -> list[models.RolloutScore]:
+        out: list[models.RolloutScore] = []
+        for r in self.rollouts(match_id):
+            out.extend(self.scores_by_rollout.get(r.id, []))
+        return out
+
+
+def _prefetch(match_ids: list[str], db: Session) -> _Prefetch:
+    if not match_ids:
+        return _Prefetch()
+    rollouts = list(
+        db.execute(
+            select(models.Rollout).where(models.Rollout.match_id.in_(match_ids))
+        ).scalars()
+    )
+    rollouts_by_match: dict[str, list[models.Rollout]] = defaultdict(list)
+    rollout_ids: list[str] = []
+    for r in rollouts:
+        rollouts_by_match[r.match_id].append(r)
+        rollout_ids.append(r.id)
+
+    scores_by_rollout: dict[str, list[models.RolloutScore]] = defaultdict(list)
+    if rollout_ids:
+        for s in db.execute(
+            select(models.RolloutScore).where(
+                models.RolloutScore.rollout_id.in_(rollout_ids)
+            )
+        ).scalars():
+            scores_by_rollout[s.rollout_id].append(s)
+
+    return _Prefetch(dict(rollouts_by_match), dict(scores_by_rollout))
 
 # Palette slots assigned in ranked order (mirrors design.js CANDIDATE_PALETTE).
 _PALETTE_VARS = ["--c-slot1", "--c-slot2", "--c-slot3", "--c-slot4", "--c-slot5"]
@@ -209,6 +262,7 @@ def _build_candidate(
     palette_var: str,
     population_mean: float,
     triage_decision: str,
+    prefetch: "_Prefetch",
 ) -> dict[str, Any]:
     report = match.report or {}
     dim_means = _dim_mean_map(report)
@@ -251,8 +305,14 @@ def _build_candidate(
     # role_fit axes = criteria means + per-skill scores.
     role_fit = {**dim_means, **role_fit_skills}
 
-    team_fit = compute_team_fit(match, db)
-    overall_fit = compute_overall_fit(match, db)
+    # All rollout/score reads below come from the request-level prefetch —
+    # no per-candidate queries.
+    roll = prefetch.rollouts(match.id)
+    scores_by_rollout = prefetch.scores_by_rollout
+    team_fit = compute_team_fit(match, rollouts=roll, scores_by_rollout=scores_by_rollout)
+    overall_fit = compute_overall_fit(
+        match, rollouts=roll, scores_by_rollout=scores_by_rollout, team_fit=team_fit
+    )
 
     # Signals — 4 tiles from the strongest / weakest criteria.
     signals = _build_signals(position, dim_means)
@@ -261,7 +321,7 @@ def _build_candidate(
     tell = _build_tell(position, dim_means)
 
     # Per-scenario responses.
-    responses = _build_responses(match, position, db)
+    responses = _build_responses(match, position, rollouts=roll)
 
     score = int(match.overall_score or report.get("overallScore") or 0)
     return {
@@ -276,7 +336,7 @@ def _build_candidate(
         "delta": _delta_str(score - population_mean),
         "linkedin_url": candidate.linkedin_url,
         "cv_available": bool(candidate.cv_path),
-        "hero_quote": pick_hero_quote(match, db),
+        "hero_quote": pick_hero_quote(match, rollouts=roll, scores=prefetch.scores_for(match.id)),
         "signals": signals,
         "overview": overview,
         "tell": tell,
@@ -323,17 +383,22 @@ def _build_tell(position: models.Position, dim_means: dict[str, int]) -> str:
 
 
 def _build_responses(
-    match: models.Match, position: models.Position, db: Session
+    match: models.Match,
+    position: models.Position,
+    db: Session | None = None,
+    *,
+    rollouts: list[models.Rollout] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Per-scenario response: the candidate's most substantive turn + score."""
     scenario_aggs = {
         sa["scenarioId"]: sa for sa in (match.report or {}).get("scenarioAggregates") or []
     }
-    rollouts = list(
-        db.execute(
-            select(models.Rollout).where(models.Rollout.match_id == match.id)
-        ).scalars()
-    )
+    if rollouts is None:
+        rollouts = list(
+            db.execute(
+                select(models.Rollout).where(models.Rollout.match_id == match.id)
+            ).scalars()
+        )
     # Group rollouts by scenario; pick the first completed rollout per scenario.
     by_scenario: dict[str, list[models.Rollout]] = {}
     for r in rollouts:
@@ -416,6 +481,9 @@ def _completed_matches(position_id: str, db: Session) -> list[tuple[models.Match
     rows = db.execute(
         select(models.Match, models.Candidate)
         .join(models.Candidate, models.Match.candidate_id == models.Candidate.id)
+        # Eager-load the profile so the long-cycle tenure heuristic doesn't
+        # lazy-load verified_profile once per candidate.
+        .options(selectinload(models.Candidate.verified_profile))
         .where(
             models.Match.position_id == position_id,
             models.Match.status == "succeeded",
@@ -486,6 +554,11 @@ def build_shortlist_report(
         active_pairs = ranked[:top_n]
         available_pairs = ranked[top_n : top_n + _AVAILABLE_CAP]
 
+    # Load every candidate's rollouts + scores in two queries up front, so the
+    # per-candidate builders below issue zero further queries.
+    all_match_ids = [m.id for m, _ in active_pairs] + [m.id for m, _ in available_pairs]
+    prefetch = _prefetch(all_match_ids, db)
+
     def to_reports(pairs: list[tuple[models.Match, models.Candidate]]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for idx, (match, candidate) in enumerate(pairs):
@@ -498,6 +571,7 @@ def build_shortlist_report(
                     palette_var=_PALETTE_VARS[idx % len(_PALETTE_VARS)],
                     population_mean=population_mean,
                     triage_decision=triage.get(candidate.id, "undecided"),
+                    prefetch=prefetch,
                 )
             )
         return out
@@ -531,6 +605,8 @@ def build_triage_queue(
     population_scores = [m.overall_score or 0 for m, _ in ranked]
     population_mean = mean(population_scores) if population_scores else 0.0
 
+    prefetch = _prefetch([m.id for m, _ in ranked], session)
+
     candidates: list[dict[str, Any]] = []
     for match, candidate in ranked:
         # The queue shows everyone; the client greys out those already decided.
@@ -544,7 +620,11 @@ def build_triage_queue(
                 "score": score,
                 "band": match.band or "",
                 "delta": _delta_str(score - population_mean),
-                "hero_quote": pick_hero_quote(match, session),
+                "hero_quote": pick_hero_quote(
+                    match,
+                    rollouts=prefetch.rollouts(match.id),
+                    scores=prefetch.scores_for(match.id),
+                ),
                 "signals": _build_signals(position, _dim_mean_map(match.report or {})),
             }
         )
