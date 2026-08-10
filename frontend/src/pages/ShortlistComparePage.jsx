@@ -11,6 +11,7 @@ import CVModal from "../components/v7/CVModal.jsx";
 import ScenarioComparison from "../components/v7/ScenarioComparison.jsx";
 import FitChart from "../components/v7/FitChart.jsx";
 import ScheduleInterviewModal from "../components/ScheduleInterviewModal.jsx";
+import { triage as triageApi } from "../api.js";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -118,9 +119,14 @@ export default function ShortlistComparePage() {
     if (report?.candidates?.length) setInviteFor(report.candidates[0]);
   }
   async function decline(candidate) {
-    // Declining is a manager-side, candidate-blind action (no notification).
+    // Declining is a manager-side, candidate-blind action (no notification —
+    // only /interviews/schedule ever contacts a candidate). Persist as a
+    // triage "pass" so the decision survives a reload, then drop from the set.
     setBusyId(candidate.id);
     try {
+      triageApi
+        .decide(positionId, { candidate_id: candidate.id, decision: "pass" })
+        .catch(() => {});
       removeCandidate(candidate.id);
     } finally {
       setBusyId(null);
