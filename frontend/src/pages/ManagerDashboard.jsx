@@ -480,6 +480,8 @@ function PositionsTab({
             company={c}
             selected={selectedPosition === c.id}
             onSelect={() => setSelectedPosition(c.id)}
+            onOpenShortlist={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/shortlist`); }}
+            onOpenTriage={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/triage`); }}
             onEdit={(e) => { e.stopPropagation(); nav(`/manager/templates/${c.id}`); }}
             onViewTeam={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/team`); }}
             onViewScenarios={(e) => { e.stopPropagation(); nav(`/manager/positions/${c.id}/scenarios`); }}
@@ -514,15 +516,23 @@ function PositionsTab({
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function PositionCard({ company, selected, onSelect, onEdit, onViewTeam, onViewScenarios }) {
+function PositionCard({
+  company,
+  selected,
+  onSelect,
+  onOpenShortlist,
+  onOpenTriage,
+  onEdit,
+  onViewTeam,
+  onViewScenarios,
+}) {
   return (
     <div
       onClick={onSelect}
       style={{
         display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 10,
+        flexDirection: "column",
+        gap: 12,
         padding: "14px 16px",
         border: `1px solid ${selected ? COLORS.ink : COLORS.rule}`,
         background: selected ? "#fff" : "transparent",
@@ -530,42 +540,70 @@ function PositionCard({ company, selected, onSelect, onEdit, onViewTeam, onViewS
         transition: "border 0.15s, background 0.15s",
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>
-          {company.name}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500 }}>
+            {company.name}
+          </div>
+          <div style={{ color: COLORS.muted, fontSize: 13 }}>{company.role}</div>
+          {company.tagline && (
+            <div style={{ color: COLORS.muted, fontSize: 12, fontStyle: "italic", marginTop: 2 }}>
+              {company.tagline}
+            </div>
+          )}
+          {(company.role_family || company.target_seniority) && (
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 9,
+                color: COLORS.muted,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                marginTop: 4,
+              }}
+            >
+              {company.role_family?.replace(/_/g, " ")}
+              {company.target_seniority && ` · ${company.target_seniority}`}
+              {company.is_open === false && " · closed"}
+            </div>
+          )}
         </div>
-        <div style={{ color: COLORS.muted, fontSize: 13 }}>{company.role}</div>
-        {company.tagline && (
-          <div style={{ color: COLORS.muted, fontSize: 12, fontStyle: "italic", marginTop: 2 }}>
-            {company.tagline}
-          </div>
-        )}
-        {(company.role_family || company.target_seniority) && (
-          <div
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: 9,
-              color: COLORS.muted,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              marginTop: 4,
-            }}
-          >
-            {company.role_family?.replace(/_/g, " ")}
-            {company.target_seniority && ` · ${company.target_seniority}`}
-            {company.is_open === false && " · closed"}
-          </div>
-        )}
+        <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <KebabMenu
+            ariaLabel={`Actions for ${company.name}`}
+            items={[
+              { label: "Team", onClick: onViewTeam },
+              { label: "Scenarios", onClick: onViewScenarios },
+              { label: "Edit", onClick: onEdit },
+            ]}
+          />
+        </div>
       </div>
-      <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-        <KebabMenu
-          ariaLabel={`Actions for ${company.name}`}
-          items={[
-            { label: "Team", onClick: onViewTeam },
-            { label: "Scenarios", onClick: onViewScenarios },
-            { label: "Edit", onClick: onEdit },
-          ]}
-        />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <button
+          className="primary"
+          onClick={onOpenShortlist}
+          style={{ padding: "8px 16px", fontSize: 11 }}
+        >
+          Open shortlist →
+        </button>
+        <button
+          onClick={onOpenTriage}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: FONT_MONO,
+            fontSize: 11,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: COLORS.muted,
+            padding: 0,
+          }}
+        >
+          Open triage
+        </button>
       </div>
     </div>
   );

@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import require_manager
+from ..auth import CurrentUser, require_manager
+from ..config import settings
 from ..db import get_session
+from ..services.comparison_builder import build_shortlist_report
 
 router = APIRouter(
     prefix="/positions",
@@ -264,6 +266,41 @@ def get_leaderboard(
         ),
         results=rows,
     )
+
+
+@router.get(
+    "/{position_id}/shortlist", response_model=schemas.ShortlistComparisonReport
+)
+def shortlist_report(
+    position_id: str,
+    candidate_ids: Annotated[list[str] | None, Query()] = None,
+    top_n: Annotated[int, Query(ge=1, le=50)] = 3,
+    db: Session = Depends(get_session),
+    user: CurrentUser = Depends(require_manager),
+) -> schemas.ShortlistComparisonReport:
+    """Manager Shortlist V7 — comparison report (auto top-N or explicit set).
+
+    ``candidate_ids`` (repeatable query param) selects an explicit comparison
+    set; otherwise the top-N completed matches by overall score are returned.
+    """
+    if not settings.enable_v7:
+        raise HTTPException(status_code=404, detail="V7 not enabled")
+
+    # A comma-joined single value is also accepted for convenience.
+    if candidate_ids and len(candidate_ids) == 1 and "," in candidate_ids[0]:
+        candidate_ids = [c for c in candidate_ids[0].split(",") if c]
+
+    try:
+        payload = build_shortlist_report(
+            position_id=position_id,
+            candidate_ids=candidate_ids,
+            top_n=top_n,
+            session=db,
+            manager_id=user.auth_user_id,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return schemas.ShortlistComparisonReport.model_validate(payload)
 
 
 # ---------------------------------------------------------------------------

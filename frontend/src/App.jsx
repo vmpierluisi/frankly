@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, GLOBAL_CSS } from "./design.js";
 import { setSessionGetter } from "./api.js";
 import { useAuth } from "./lib/auth.js";
@@ -15,6 +15,8 @@ import TranscriptViewer from "./pages/TranscriptViewer.jsx";
 import OrganizationSettings from "./pages/OrganizationSettings.jsx";
 import TeamDetail from "./pages/TeamDetail.jsx";
 import ReliabilityAuditPanel from "./pages/ReliabilityAuditPanel.jsx";
+import ShortlistComparePage from "./pages/ShortlistComparePage.jsx";
+import TriageQueuePage from "./pages/TriageQueuePage.jsx";
 import Login from "./pages/Login.jsx";
 
 // Wire the session getter into the API module once at startup.
@@ -89,6 +91,27 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* Manager Shortlist V7 — primary landing for a position. */}
+        <Route
+          path="/manager/positions/:positionId"
+          element={<PositionRootRedirect />}
+        />
+        <Route
+          path="/manager/positions/:positionId/shortlist"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <ShortlistComparePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/manager/positions/:positionId/triage"
+          element={
+            <RequireAuth auth={auth} role="manager">
+              <TriageQueuePage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/manager/positions/:positionId/team"
           element={
@@ -141,10 +164,16 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
-      <Footer />
+      {/* Footer disclaimer strip dropped per V7 plan §11 (blind-matching /
+          mutual-opt-in are backend invariants, not chrome). */}
     </>
   );
+}
+
+// /manager/positions/:positionId → its shortlist (V7 default landing).
+function PositionRootRedirect() {
+  const { positionId } = useParams();
+  return <Navigate to={`/manager/positions/${positionId}/shortlist`} replace />;
 }
 
 function RootRedirect({ auth }) {
@@ -202,13 +231,12 @@ function Masthead({ auth }) {
       }}
     >
       <div>
-        <div className="label-mono">Screening Instrument · v0</div>
+        {/* Demo-only "Screening Instrument · v0" sub-label dropped per V7 plan §11. */}
         <div
           style={{
             fontFamily: FONT_DISPLAY,
             fontSize: 32,
             fontWeight: 500,
-            marginTop: 4,
             letterSpacing: "-0.01em",
           }}
         >
@@ -247,22 +275,3 @@ function Masthead({ auth }) {
   );
 }
 
-function Footer() {
-  return (
-    <footer
-      style={{
-        borderTop: `1px solid ${COLORS.rule}`,
-        padding: "24px 48px",
-        color: COLORS.muted,
-        fontSize: 13,
-        display: "flex",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 12,
-      }}
-    >
-      <div className="label-mono">Screening signal · Not a decision</div>
-      <div className="label-mono">Blind matching · Mutual opt-in required</div>
-    </footer>
-  );
-}

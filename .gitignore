@@ -23,3 +23,10 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Local env overrides
+.env.local
+.env.*.local
+
+# DB backups
+*.db.bak

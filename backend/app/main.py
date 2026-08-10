@@ -23,6 +23,7 @@ from .routes import (
     team,
     teams,
     templates,
+    triage,
 )
 from .schemas import HealthOut
 from .seed_data import seed_positions, backfill_position_role_families
@@ -96,3 +97,4 @@ app.include_router(interviews.router)
 app.include_router(notifications.router)
 app.include_router(calibration.router)
 app.include_router(audit.router)
+app.include_router(triage.router)

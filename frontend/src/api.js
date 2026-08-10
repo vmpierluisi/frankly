@@ -124,6 +124,17 @@ export const positions = {
   remove: (id) =>
     request(`/positions/${id}`, { method: "DELETE", auth: true, raw: true }),
   leaderboard: (id) => request(`/positions/${id}/leaderboard`, { auth: true }),
+  // Manager Shortlist V7 — comparison report. Pass { topN } for auto top-N or
+  // { candidateIds: [...] } for an explicit set (candidateIds wins if present).
+  shortlist: (id, { topN = 3, candidateIds = null } = {}) => {
+    const qs = new URLSearchParams();
+    if (candidateIds && candidateIds.length) {
+      candidateIds.forEach((cid) => qs.append("candidate_ids", cid));
+    } else {
+      qs.set("top_n", String(topN));
+    }
+    return request(`/positions/${id}/shortlist?${qs.toString()}`, { auth: true });
+  },
 };
 
 // ---------- Templates (artifact parse + criteria extract) ----------
@@ -275,6 +286,18 @@ export const calibration = {
       auth: true,
     }),
   timeline: () => request("/calibration/timeline", { auth: true }),
+};
+
+// ---------- Manager Shortlist V7 — triage (optional manual flow) ----------
+export const triage = {
+  queue: (positionId) =>
+    request(`/positions/${positionId}/queue`, { auth: true }),
+  decide: (positionId, { candidate_id, decision }) =>
+    request(`/positions/${positionId}/queue/decision`, {
+      method: "POST",
+      body: { candidate_id, decision },
+      auth: true,
+    }),
 };
 
 export const API_BASE = BASE;

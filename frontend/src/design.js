@@ -11,6 +11,21 @@ export const COLORS = {
   cardBg: "#ffffff",
 };
 
+// Manager Shortlist V7 — per-candidate colour rotation. The backend assigns
+// slot1..slot5 in ranked order (see comparison_builder._PALETTE_VARS) and the
+// frontend maps the returned `--c-slotN` var to these hues.
+export const CANDIDATE_PALETTE = {
+  "--c-slot1": "#2c5163", // slate teal
+  "--c-slot2": "#6b8154", // sage
+  "--c-slot3": "#7a4a64", // plum
+  "--c-slot4": "#a67a2d", // ochre
+  "--c-slot5": "#a65538", // terra-cotta
+};
+
+export function candidateColor(paletteVar) {
+  return CANDIDATE_PALETTE[paletteVar] || CANDIDATE_PALETTE["--c-slot1"];
+}
+
 export const FONT_DISPLAY = `'EB Garamond', 'Libre Caslon Text', 'Times New Roman', serif`;
 export const FONT_BODY = `'EB Garamond', Georgia, serif`;
 export const FONT_MONO = `'JetBrains Mono', 'Courier New', monospace`;

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { COLORS, FONT_DISPLAY, FONT_MONO } from "../design.js";
 import { positions, matches } from "../api.js";
 import FitProfileV3 from "./FitProfileV3.jsx";
@@ -20,6 +21,7 @@ function bandColor(band) {
 }
 
 export default function PositionLeaderboard({ positionId }) {
+  const nav = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,8 +91,28 @@ export default function PositionLeaderboard({ positionId }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
         <div className="label-mono">Candidate leaderboard</div>
-        <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: COLORS.muted, letterSpacing: "0.1em" }}>
-          {succeeded.length} evaluated · {inFlight.length} in progress · {failed.length} failed
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {succeeded.length > 0 && (
+            <button
+              onClick={() => nav(`/manager/positions/${positionId}/shortlist`)}
+              style={{
+                background: "transparent",
+                border: `1px solid ${COLORS.ink}`,
+                cursor: "pointer",
+                fontFamily: FONT_MONO,
+                fontSize: 10,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: COLORS.ink,
+                padding: "6px 12px",
+              }}
+            >
+              Open shortlist comparison →
+            </button>
+          )}
+          <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: COLORS.muted, letterSpacing: "0.1em" }}>
+            {succeeded.length} evaluated · {inFlight.length} in progress · {failed.length} failed
+          </div>
         </div>
       </div>
       <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, marginBottom: 4 }}>
@@ -135,6 +157,7 @@ export default function PositionLeaderboard({ positionId }) {
                 row={row}
                 rank={idx + 1}
                 prominent
+                positionId={positionId}
                 expanded={expandedMatchId === row.match_id}
                 criteriaIndex={criteriaIndex}
                 onToggle={() =>
@@ -159,6 +182,7 @@ export default function PositionLeaderboard({ positionId }) {
                 row={row}
                 rank={topFive.length + idx + 1}
                 prominent={false}
+                positionId={positionId}
                 expanded={expandedMatchId === row.match_id}
                 criteriaIndex={criteriaIndex}
                 onToggle={() =>
@@ -208,7 +232,8 @@ export default function PositionLeaderboard({ positionId }) {
 
 // ─── Succeeded row ──────────────────────────────────────────────────────────
 
-function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggle }) {
+function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggle, positionId }) {
+  const nav = useNavigate();
   const scoreColor = bandColor(row.band);
 
   return (
@@ -344,6 +369,28 @@ function LeaderboardRow({ row, rank, prominent, expanded, criteriaIndex, onToggl
             background: "#fafafa",
           }}
         >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <span className="label-mono" style={{ fontSize: 10 }}>Legacy single-candidate report</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                nav(`/manager/positions/${positionId}/shortlist?candidate_ids=${row.candidate_id}`);
+              }}
+              style={{
+                background: COLORS.ink,
+                color: COLORS.paper,
+                border: "none",
+                cursor: "pointer",
+                fontFamily: FONT_MONO,
+                fontSize: 10,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                padding: "8px 14px",
+              }}
+            >
+              Compare in shortlist →
+            </button>
+          </div>
           <FitProfileV3
             report={{ ...row.report, matchId: row.match_id }}
             candidate={{
